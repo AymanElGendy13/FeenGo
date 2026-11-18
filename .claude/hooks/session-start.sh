@@ -82,8 +82,14 @@ node_setup() (
 
   nvmrc="${CLAUDE_PROJECT_DIR:-.}/.nvmrc"
   [ -f "$nvmrc" ] || exit 0
-  # Read only the first 32 bytes, and never print what the file holds.
-  ver="$(head -c 32 "$nvmrc" 2>/dev/null | tr -d '[:space:]')"
+  # Read at most 33 bytes, and never print what the file holds. A file of
+  # 33 bytes or more is longer than any version line, so it is rejected.
+  raw="$(head -c 33 "$nvmrc" 2>/dev/null)"
+  if [ "${#raw}" -ge 33 ]; then
+    echo "session-start: .nvmrc does not hold an exact version like 26.13.1, so Node was not set up. Install the right Node by hand."
+    exit 0
+  fi
+  ver="$(printf '%s' "$raw" | tr -d '[:space:]')"
   ver="${ver#v}"
   if ! [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "session-start: .nvmrc does not hold an exact version like 26.13.1, so Node was not set up. Install the right Node by hand."
@@ -181,7 +187,7 @@ node_setup() (
     # Move a broken cache entry aside (the trap deletes it), then move the
     # checked build in with one rename. Check again first: if another session
     # has just installed a good copy, keep it and use it.
-    if [ -e "$cache" ] && [ "$("$cache/bin/node" -v 2>/dev/null)" != "v$ver" ]; then
+    if { [ -e "$cache" ] || [ -L "$cache" ]; } && [ "$("$cache/bin/node" -v 2>/dev/null)" != "v$ver" ]; then
       mv -T "$cache" "$tmp/old" 2>/dev/null
     fi
     if ! mv -T "$unpacked" "$cache" 2>/dev/null \
