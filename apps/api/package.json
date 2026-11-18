@@ -1,0 +1,52 @@
+{
+  "name": "@feengo/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FeenGo NestJS API: one backend for the app, the partner dashboard and the admin back office.",
+  "type": "module",
+  "engines": {
+    "node": ">=26.13.1 <27"
+  },
+  "scripts": {
+    "start:dev": "nest start --watch",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.5.1",
+    "@nestjs/config": "12.1.1",
+    "@nestjs/core": "12.5.1",
+    "@nestjs/platform-express": "12.5.1",
+    "helmet": "8.3.0",
+    "ioredis": "6.0.0",
+    "kysely": "0.29.9",
+    "nestjs-pino": "5.3.2",
+    "pg": "8.23.1",
+    "pino": "10.4.0",
+    "pino-http": "11.0.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "12.0.13",
+    "@nestjs/schematics": "12.0.13",
+    "@nestjs/testing": "12.5.1",
+    "@types/express": "5.0.6",
+    "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
+    "@types/supertest": "7.2.1",
+    "@vitest/coverage-v8": "4.1.12",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "pino-pretty": "13.2.0",
+    "supertest": "7.3.2",
+    "typescript": "6.0.3",
+    "vite": "8.3.8",
+    "vitest": "4.1.12",
+    "yaml": "2.9.1"
+  }
+}
