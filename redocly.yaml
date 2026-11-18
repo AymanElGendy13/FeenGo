@@ -1,0 +1,15 @@
+extends:
+  - recommended
+rules:
+  rule/operation-x-roles:
+    subject: { type: Operation, property: x-roles }
+    assertions: { defined: true }
+    severity: error
+  rule/operation-x-rate-limit:
+    subject: { type: Operation, property: x-rate-limit }
+    assertions: { defined: true }
+    severity: error
+  rule/operation-x-idempotency-key:
+    subject: { type: Operation, property: x-idempotency-key }
+    assertions: { defined: true }
+    severity: error

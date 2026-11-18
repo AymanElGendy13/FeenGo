@@ -10,7 +10,8 @@
   "scripts": {
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "contract:lint": "redocly lint docs/api/openapi.yaml"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
