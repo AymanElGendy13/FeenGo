@@ -68,25 +68,42 @@ describe('logging', () => {
   }
 
   it('S0 the request log line holds method, route pattern, status, duration and request ID', async () => {
+    const server = app.getHttpServer();
+    const ok = await request(server).get('/health');
+    expect(ok.status).toBe(200);
     // The health routes take no query parameters, so this one is refused (400).
-    const res = await request(app.getHttpServer()).get('/health?phone=%2B201001234567');
-    expect(res.status).toBe(400);
-    await waitForRequestLines(1);
-    const [line] = requestLines();
-    expect(line).toMatchObject({
+    const refused = await request(server).get('/health?phone=%2B201001234567');
+    expect(refused.status).toBe(400);
+    await waitForRequestLines(2);
+    const [okLine, refusedLine] = [ok, refused].map((res) =>
+      requestLines().find((line) => line.requestId === res.headers['x-request-id']),
+    );
+
+    expect(okLine).toMatchObject({
+      level: 30,
+      msg: 'request completed',
+      requestId: ok.headers['x-request-id'],
+      method: 'GET',
+      route: '/health',
+      statusCode: 200,
+    });
+    expect(okLine).not.toHaveProperty('errorCode');
+    expect(refusedLine).toMatchObject({
       level: 40,
       msg: 'request completed',
-      requestId: res.headers['x-request-id'],
+      requestId: refused.headers['x-request-id'],
       method: 'GET',
       route: '/health',
       statusCode: 400,
       errorCode: 'VALIDATION_FAILED',
     });
-    expect(line?.responseTime).toBeTypeOf('number');
-    // Never the raw URL, headers or a body.
-    expect(JSON.stringify(line)).not.toContain('phone');
-    for (const key of ['req', 'res', 'url', 'headers', 'body']) {
-      expect(line).not.toHaveProperty(key);
+    for (const line of [okLine, refusedLine]) {
+      expect(line?.responseTime).toBeTypeOf('number');
+      // Never the raw URL, headers or a body.
+      expect(JSON.stringify(line)).not.toContain('phone');
+      for (const key of ['req', 'res', 'url', 'headers', 'body']) {
+        expect(line).not.toHaveProperty(key);
+      }
     }
   });
 
