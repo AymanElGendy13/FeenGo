@@ -2,6 +2,10 @@
 
 A running log of decisions, newest first. Add an entry whenever something significant is decided, so it is not argued again. Each entry says what was decided and why.
 
+## 2026-11-18: Two-tier merging
+
+The owner merges documents, decisions, the API contract, data-model changes, new dependencies, security and sign-in code, CI secrets and permissions, and anything released to testers or stores. The main Claude session merges plain build increments that only implement what is already approved, once CI is green and required on `main`, the reviewer approves with no open findings, qa-tester passes, and nothing new is decided. It then posts a summary for the owner. Subagents never merge: they all act through the owner's GitHub account, so an agent's approval is not an independent check. This keeps the owner on every decision without making them the bottleneck for each small build step. Auto-merge starts after CI exists (C3) and the owner has turned on required status checks for `main`. Decided by the owner.
+
 ## 2026-11-18: English first, Arabic second
 
 English is the app's primary and default language, and screens are designed in English first. Arabic remains a full second language: every text exists in both, and every screen is checked right to left. Replaces the earlier "Arabic first" wording in `CLAUDE.md`. Decided by the owner.

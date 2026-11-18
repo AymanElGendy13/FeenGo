@@ -42,7 +42,14 @@ Each feature in a slice goes through architect, then ui-ux-designer, then builde
 - Deliver work as small, single-feature pull requests. Each feature pull request is reviewed and merged before the next one starts. Design specs and documents for the next slice may be prepared alongside.
 - Plan before editing. For anything bigger than a small fix, present a plan and wait for approval.
 - Work on a branch named `<slice>/<requirement-id>-<short-name>`, for example `s1/c-02-otp-login`. Never commit to `main`.
-- Every change reaches `main` through a pull request, after tests pass, the reviewer subagent approves, and the owner approves.
+- Every change reaches `main` through a pull request, after tests pass and the reviewer subagent approves. Who merges depends on the kind of change:
+
+  | Kind of pull request | Who merges |
+  | --- | --- |
+  | Documents (`docs/**`, `CLAUDE.md`, `.claude/**`), any decision, the API contract or the data model, a dependency outside the approved list in `docs/ARCHITECTURE.md`, security or sign-in code, CI secrets or permissions, anything released to testers or stores | The owner |
+  | A build increment that only implements what is already approved | The main Claude session, when every auto-merge condition below holds |
+
+  Auto-merge conditions, all required: CI is green and required by branch protection on `main`; the reviewer subagent approves with no open findings; qa-tester passes; and the pull request adds no dependency, decision, migration or contract change. The main session merges with the GitHub merge tool only, never overrides a failing check, and posts a short summary on the pull request for the owner. If any condition fails, the pull request waits for the owner. No subagent merges. The owner can revert any auto-merged pull request.
 - Change `docs/api/openapi.yaml` before the code that uses it.
 - Each folder under `apps/` has one owning subagent. Two subagents never edit the same files at the same time.
 - Record every significant decision in `docs/DECISIONS.md`.
