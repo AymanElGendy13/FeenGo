@@ -41,7 +41,7 @@ Visual designs are made and approved by the owner outside the repository, then e
 
 ## Design standards
 
-- Arabic is the primary language. Design in Arabic first, then check English.
+- English is the primary language. Design in English first, then check Arabic, including right-to-left layout, on every screen.
 - Use logical directions (start and end), never left and right.
 - Text meets WCAG AA contrast (4.5 to 1 for body text) in light and dark mode.
 - Layouts survive the largest system text size without cutting off text.

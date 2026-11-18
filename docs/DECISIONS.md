@@ -2,6 +2,22 @@
 
 A running log of decisions, newest first. Add an entry whenever something significant is decided, so it is not argued again. Each entry says what was decided and why.
 
+## 2026-11-18: English first, Arabic second
+
+English is the app's primary and default language, and screens are designed in English first. Arabic remains a full second language: every text exists in both, and every screen is checked right to left. Replaces the earlier "Arabic first" wording in `CLAUDE.md`. Decided by the owner.
+
+## 2026-11-18: PostgreSQL without PostGIS
+
+Plain PostgreSQL is enough for launch. Venues store latitude and longitude, and "venues near me" (C-05) is a distance calculation in Postgres, which is fast enough at launch scale. PostGIS can be added later by a migration that derives a location column from the stored latitude and longitude. Replaces PostGIS in the stack entry below. Decided by the owner.
+
+## 2026-11-18: AWS later, low-cost hosting until then
+
+An AWS subscription waits until the app needs to scale. Until then the API and dashboards run as Docker containers on a low-cost host, chosen before S1 from options the architect prepares. Because everything is in containers, moving to AWS later is a move, not a rewrite. Each hosting option must meet the security baseline in `docs/STACK.md`: HTTPS, database and backups encrypted at rest, a secrets store, and separate development, staging and production. The options also note where data is stored, for Egypt's Personal Data Protection Law. Replaces AWS in the stack entry below. Decided by the owner.
+
+## 2026-11-18: Small, single-feature deliveries
+
+Work inside a slice is delivered as small pull requests, one feature each, reviewed and merged before the next feature starts. Design specs and documents for the next slice may be prepared alongside. Small changes are easier to review, test and roll back. Decided by the owner.
+
 ## 2026-11-18: The app is called FeenGo
 
 "Feen" (where) plus "Go": "where to go?" in Egyptian Arabic and English. Always written with a capital G, so it is not read as "Fingo".

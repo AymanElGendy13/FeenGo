@@ -8,14 +8,14 @@ The stack was confirmed on 18 November 2026. Changing any line here needs an ent
 | --- | --- | --- |
 | Mobile app | Flutter | One codebase for iPhone and Android. Arabic and right-to-left support from the first screen. |
 | Backend | NestJS, TypeScript | One well-structured backend with clear modules, split into services only when load requires it |
-| Database | PostgreSQL with PostGIS | PostGIS for "venues near me" |
+| Database | PostgreSQL | Venue latitude and longitude are plain columns, and "venues near me" is a distance calculation in Postgres. PostGIS can be added later if search needs it. |
 | Cache and queues | Redis | Slot holds, rate limits and background jobs |
 | Partner and admin dashboards | Next.js, TypeScript | Two separate apps, one shared component library |
 | Payments | Paymob | Cards, Egyptian wallets, Apple Pay and Google Pay. Bookings are real-world services, so store in-app purchase is not used. |
 | One-time codes | WhatsApp, with SMS fallback | Behind one interface so the provider can change |
 | Push, analytics, crash reports | Firebase | |
 | Maps | Google Maps | |
-| Hosting | AWS, Docker containers | Development, staging and production environments |
+| Hosting | Docker containers on low-cost hosting now, AWS when scaling | The low-cost host is chosen before S1. Development, staging and production stay separate. |
 | Build pipeline | GitHub Actions, Fastlane | Fastlane handles store uploads |
 | Testing | Flutter tests, Maestro or Appium, Playwright, Jest, k6 | |
 
@@ -56,7 +56,7 @@ No change is merged unless all of these pass:
 
 - Unit tests for business rules, such as slot holds, cancellation windows and deposits.
 - API tests against the contract.
-- End-to-end tests of the slice's main journeys on the app and the dashboards.
+- End-to-end tests of the main journeys the change touches, on the app and the dashboards. A slice is only done when all of its main journeys pass (see `docs/ROADMAP.md`).
 - A review by the reviewer agent, then the owner's approval.
 
 Before the first public release, add a load test at 10 times expected launch traffic and a full manual pass in Arabic and English on real phones.

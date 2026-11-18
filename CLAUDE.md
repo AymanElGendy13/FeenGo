@@ -1,6 +1,6 @@
 # FeenGo
 
-Marketplace app for Egypt: people find restaurants, cafes and venues, book tables, and request events such as birthdays and engagements. Arabic first, English second.
+Marketplace app for Egypt: people find restaurants, cafes and venues, book tables, and request events such as birthdays and engagements. English first, Arabic second. Arabic is a full second language, laid out right to left.
 
 ## Read before working
 
@@ -33,12 +33,13 @@ Marketplace app for Egypt: people find restaurants, cafes and venues, book table
 | reviewer | Nothing; read-only | Review of every change before a pull request |
 | release-manager | `.github/`, Docker, Fastlane, `store/` | Pipeline, environments, tester releases, store preparation |
 
-Order within a slice: architect, then ui-ux-designer, then builders in parallel, then qa-tester, then reviewer.
+Each feature in a slice goes through architect, then ui-ux-designer, then builders, then qa-tester, then reviewer, as its own small pull request. Builders may work on the same feature in parallel, each in their own folders.
 
 ## How we work
 
-- Before every task, run `git fetch origin` and bring your branch up to date with `origin/main`. Never work from a stale checkout. Cloud sessions do this automatically at start through `.claude/hooks/session-start.sh`.
+- Before every task, run `git fetch origin` and bring your branch up to date with `origin/main`: fast-forward it, or merge `origin/main` if the branch has its own commits. Never rebase a branch that has been pushed. Never work from a stale checkout. Cloud sessions do this automatically at start through `.claude/hooks/session-start.sh`.
 - Work only on the current slice in `docs/ROADMAP.md`. Do not build ahead.
+- Deliver work as small, single-feature pull requests. Each feature pull request is reviewed and merged before the next one starts.
 - Plan before editing. For anything bigger than a small fix, present a plan and wait for approval.
 - Work on a branch named `<slice>/<requirement-id>-<short-name>`, for example `s1/c-02-otp-login`. Never commit to `main`.
 - Every change reaches `main` through a pull request, after tests pass, the reviewer subagent approves, and the owner approves.

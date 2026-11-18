@@ -2,6 +2,8 @@
 
 FeenGo is built and released one feature slice at a time. Each slice is a complete piece a person can use, working across every product it touches. Requirement IDs refer to `docs/PRD.md`.
 
+Within a slice, work is delivered as small, single-feature pull requests. Each feature pull request is reviewed and merged before the next feature starts, so the product grows one working piece at a time. Design specs and documents for the next slice may be prepared alongside.
+
 **Current slice: S0 Foundation**
 
 Update the line above when a slice is finished.
@@ -28,7 +30,7 @@ S0 builds no features. It builds the base every slice stands on.
 - Repository layout as described in `CLAUDE.md`.
 - Flutter app shell: app name FeenGo, light and dark themes from the design tokens below, Arabic and English with right-to-left layout, a language switch, and one placeholder home screen.
 - NestJS API with a health-check endpoint, configuration from environment variables, structured logging, and a database connection.
-- PostgreSQL with PostGIS, and Redis, running locally through Docker Compose.
+- PostgreSQL and Redis, running locally through Docker Compose.
 - The partner dashboard and the admin back office as empty Next.js apps with the same tokens, in Arabic and English.
 - Database migrations set up, with the first migration creating the settings table that R-01 needs later.
 - Analytics wiring with a single test event (Q-06).
@@ -57,7 +59,7 @@ Typeface: IBM Plex Sans Arabic for Arabic and English.
 2. It works in every product it touches.
 3. Tests pass for all of its acceptance checks.
 4. The reviewer agent has checked it, and the owner has approved the merge.
-5. It is released to testers through TestFlight, Google Play internal testing and the staging dashboards.
+5. It is released to testers through TestFlight and Google Play internal testing, and the dashboards are deployed to staging (from S1, once the host is chosen).
 6. The owner has used it on a real phone.
 
 ## What shipping a slice means

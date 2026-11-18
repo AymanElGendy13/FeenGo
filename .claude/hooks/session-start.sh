@@ -11,7 +11,7 @@ fi
 
 cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 
-if ! timeout 60 git fetch --quiet origin 2>/dev/null; then
+if ! GIT_TERMINAL_PROMPT=0 timeout 30 git fetch --quiet origin 2>/dev/null; then
   echo "session-start: could not fetch from origin; the checkout may be out of date. Run 'git fetch origin' before relying on it."
   exit 0
 fi
@@ -37,8 +37,11 @@ fast_forward() {
   if [ -n "$dirty" ]; then
     echo "session-start: '$branch' is $behind commit(s) behind $target, not updated because there are uncommitted changes."
   elif git merge-base --is-ancestor HEAD "$target"; then
-    git merge --quiet --ff-only "$target" \
-      && echo "session-start: fast-forwarded '$branch' by $behind commit(s) to $target."
+    if git merge --quiet --ff-only "$target" 2>/dev/null; then
+      echo "session-start: fast-forwarded '$branch' by $behind commit(s) to $target."
+    else
+      echo "session-start: git refused to fast-forward '$branch' to $target (an untracked file may be in the way); run it by hand."
+    fi
   else
     echo "session-start: '$branch' is $behind commit(s) behind $target and has its own commits, so it was not fast-forwarded. Merge $target deliberately if it is needed."
   fi
