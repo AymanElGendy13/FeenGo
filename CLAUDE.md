@@ -16,8 +16,24 @@ Marketplace app for Egypt: people find restaurants, cafes and venues, book table
 - `apps/api`: NestJS backend
 - `apps/partner-web`: Next.js venue dashboard
 - `apps/admin-web`: Next.js admin back office
-- `docs/`: project documents
+- `packages/design-tokens`: the one source of colors, type and spacing for all three products
+- `docs/`: project documents, including `docs/design/` screen specs and `docs/testing/` test plans
 - `.claude/agents/`: subagent definitions
+
+## Subagents and what they own
+
+| Subagent | Owns | Use it for |
+| --- | --- | --- |
+| architect | `docs/ARCHITECTURE.md`, `docs/api/`, technical decisions | Data model, API contract, library choices, cross-app changes |
+| ui-ux-designer | `packages/design-tokens`, `docs/design/` | Screen specs before building, design review after |
+| mobile-dev | `apps/mobile` | The Flutter customer app |
+| web-dev | `apps/partner-web`, `apps/admin-web` | The venue dashboard and admin back office websites |
+| backend-dev | `apps/api` | Endpoints, business rules, database, integrations |
+| qa-tester | End-to-end and API tests, `docs/testing/` | Test plans, missing tests, full runs, bug reports |
+| reviewer | Nothing; read-only | Review of every change before a pull request |
+| release-manager | `.github/`, Docker, Fastlane, `store/` | Pipeline, environments, tester releases, store preparation |
+
+Order within a slice: architect, then ui-ux-designer, then builders in parallel, then qa-tester, then reviewer.
 
 ## How we work
 

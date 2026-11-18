@@ -39,7 +39,7 @@ Done when a change pushed to a branch builds and tests itself automatically, and
 
 ### Provisional design tokens
 
-These come from the brand direction and will be replaced by the design system once it is approved. Keep every color in one theme file so that change is a single edit.
+These come from the brand direction and will be replaced by the design system once it is approved. They live in `packages/design-tokens`, owned by ui-ux-designer, and all three products generate their themes from there, so a change is a single edit.
 
 | Role | Hex |
 | --- | --- |
