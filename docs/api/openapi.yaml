@@ -1,0 +1,1289 @@
+openapi: 3.1.0
+info:
+  title: FeenGo API
+  version: 0.1.0
+  summary: One API for the FeenGo customer app, partner dashboard and admin back office.
+  description: |
+    Contract for slices S0 (Foundation) and S1 (Sign-in). It changes before any code that uses it.
+    See `docs/ARCHITECTURE.md` for the design behind each endpoint.
+
+    ## Conventions
+
+    - **Versioning.** Business endpoints live under `/v1`. Health endpoints are unversioned so
+      that container probes never change.
+    - **Errors.** Every error uses one shape, `Problem` (RFC 9457 problem details), with the
+      media type `application/problem+json`. Clients choose the message to show from `code`, in
+      the user's language, from their own translation files. `detail` is English, for developers,
+      and is never shown to users.
+    - **Roles.** `x-roles` on each operation lists who may call it: `visitor` (no token),
+      `customer`, `admin`. Admin endpoints also need the second sign-in step (the access token's
+      `amr` contains `otp`). Ownership is always the caller's own data: a customer token can only
+      read and change its own customer record.
+    - **Rate limits.** `x-rate-limit` on each operation describes its limits. Limits marked
+      "setting" are read from the settings store (R-01); limits marked "config" come from
+      environment configuration. A limited request gets `429` with a `Retry-After` header.
+    - **Idempotency.** `x-idempotency-key` says whether the operation needs an `Idempotency-Key`
+      header. No S0 or S1 operation needs one; booking and payment operations (S4, S6) will.
+    - **Unknown fields.** Request bodies reject properties that are not in the contract.
+    - **Request IDs.** Every response carries `X-Request-Id`. A client may send its own
+      `X-Request-Id` (a UUID); otherwise the server makes one.
+    - **Times** are UTC, in RFC 3339 format. **Phone numbers** are E.164, for example
+      `+201001234567`.
+  contact:
+    name: FeenGo architect (docs/ARCHITECTURE.md)
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: https://{host}
+    description: |
+      The API host of an environment. Local development uses `http://localhost:3000` through
+      Docker Compose. Real host names are set once the owner chooses the host and the domain.
+    variables:
+      host:
+        default: api.staging.feengo.invalid
+        description: API host name of the environment.
+security:
+  - bearerAuth: []
+tags:
+  - name: health
+    description: Liveness and readiness probes (S0).
+  - name: auth
+    description: Customer sign-in with a phone code, token refresh and logout (S1, C-02).
+  - name: me
+    description: The signed-in customer's own profile (S1, C-03, C-04).
+  - name: admin-auth
+    description: Admin sign-in with password and authenticator code (S1, A-01).
+  - name: admin
+    description: Admin back office (S1, A-11).
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      operationId: getHealth
+      summary: Liveness probe
+      description: |
+        Returns 200 while the process is running. It does not touch the database or Redis, so a
+        database outage never makes the platform restart healthy containers.
+      security: []
+      x-roles: [visitor]
+      x-rate-limit: 'config: 120 requests per minute per IP address, well above what container probes send'
+      x-idempotency-key: not needed
+      responses:
+        '200':
+          description: The process is alive.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Liveness'
+              example:
+                status: ok
+                version: 0.1.0
+                time: '2026-11-18T10:00:00Z'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /health/ready:
+    get:
+      tags: [health]
+      operationId: getReadiness
+      summary: Readiness probe (database and Redis)
+      description: |
+        Checks the database (`SELECT 1`) and Redis (`PING`), each with a 1 second timeout.
+        Returns 200 when both are up and 503 when either is down. The platform sends traffic to
+        an instance only while it is ready.
+      security: []
+      x-roles: [visitor]
+      x-rate-limit: 'config: 60 requests per minute per IP address'
+      x-idempotency-key: not needed
+      responses:
+        '200':
+          description: Database and Redis are reachable.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Readiness'
+              example:
+                status: ok
+                checks:
+                  database: up
+                  redis: up
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: At least one dependency is down. The body says which.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Readiness'
+              example:
+                status: unavailable
+                checks:
+                  database: up
+                  redis: down
+
+  /v1/auth/otp/request:
+    post:
+      tags: [auth]
+      operationId: requestOtp
+      summary: Send a sign-in code to a phone number
+      description: |
+        Starts sign-in or sign-up (C-02). The server makes a 6-digit code, stores only its hash
+        and sends it by WhatsApp. If WhatsApp fails, the server sends it by SMS. Calling this
+        again for the same phone after the resend cooldown sends a new code and ends the earlier
+        challenge.
+
+        The response is the same whether or not the phone already has an account, so the
+        endpoint cannot be used to find out who is a customer.
+
+        Codes expire after the `auth.otp.code_ttl_seconds` setting (default 300 seconds).
+      security: []
+      x-roles: [visitor]
+      x-rate-limit: |
+        setting auth.otp.max_requests_per_phone_per_hour (default 5) per phone number;
+        setting auth.otp.max_requests_per_device_per_hour (default 10) per installation ID;
+        setting auth.otp.resend_cooldown_seconds (default 60) between codes to the same phone;
+        config 20 per hour per IP address.
+      x-idempotency-key: not needed. A repeated request inside the cooldown gets 429 OTP_RESEND_TOO_SOON and sends nothing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpRequest'
+            example:
+              phone: '+201001234567'
+              installationId: 9b2f7c1e-3a4d-4e5f-8a6b-1c2d3e4f5a6b
+              language: en
+              channel: auto
+      responses:
+        '202':
+          description: The code was handed to WhatsApp or SMS for delivery.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpChallenge'
+              example:
+                challengeId: 3f8e2a10-5b6c-4d7e-9f80-1a2b3c4d5e6f
+                channel: whatsapp
+                codeLength: 6
+                expiresAt: '2026-11-18T10:05:00Z'
+                resendAvailableAt: '2026-11-18T10:01:00Z'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '422':
+          description: |
+            The phone number is not usable. Codes: `PHONE_INVALID` (not a valid mobile number),
+            `PHONE_COUNTRY_NOT_SUPPORTED` (its country is not in the
+            `auth.otp.allowed_country_codes` setting).
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: https://docs.feengo.invalid/errors/PHONE_COUNTRY_NOT_SUPPORTED
+                title: Phone country not supported
+                status: 422
+                code: PHONE_COUNTRY_NOT_SUPPORTED
+                detail: Only numbers from EG are accepted.
+                requestId: 7d1c9a52-0f3e-4b8a-9c6d-2e1f0a9b8c7d
+        '423':
+          $ref: '#/components/responses/OtpLocked'
+        '429':
+          description: |
+            Too many requests. Codes: `OTP_RESEND_TOO_SOON` (inside the resend cooldown),
+            `RATE_LIMITED` (a per-phone, per-device or per-IP limit was reached).
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: https://docs.feengo.invalid/errors/OTP_RESEND_TOO_SOON
+                title: Please wait before asking for a new code
+                status: 429
+                code: OTP_RESEND_TOO_SOON
+                requestId: 7d1c9a52-0f3e-4b8a-9c6d-2e1f0a9b8c7d
+                retryAfterSeconds: 42
+        '503':
+          description: |
+            `OTP_DELIVERY_FAILED`: both WhatsApp and SMS refused the message. Nothing counts
+            against the customer's limits, and they can try again.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /v1/auth/otp/verify:
+    post:
+      tags: [auth]
+      operationId: verifyOtp
+      summary: Check a sign-in code and start a session
+      description: |
+        Checks the code for a challenge (C-02). On success it creates the customer if the phone
+        is new (sign-up and sign-in are the same step), registers or updates the device, and
+        returns an access token and a refresh token.
+
+        Each wrong code counts against the phone number, across all of its challenges. When the
+        count reaches the `auth.otp.max_wrong_attempts` setting (default 5), sign-in for that
+        phone is locked for the `auth.otp.lock_minutes` setting (default 15) and the challenge
+        ends. A correct code resets the count.
+
+        The `installationId` must be the one that requested the code.
+      security: []
+      x-roles: [visitor]
+      x-rate-limit: |
+        setting auth.otp.max_wrong_attempts (default 5) wrong codes per phone, then a lock of
+        setting auth.otp.lock_minutes (default 15); config 30 per hour per IP address.
+      x-idempotency-key: not needed. A challenge can be used once; a repeat gets 409 OTP_ALREADY_USED.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequest'
+            example:
+              challengeId: 3f8e2a10-5b6c-4d7e-9f80-1a2b3c4d5e6f
+              code: '493027'
+              device:
+                installationId: 9b2f7c1e-3a4d-4e5f-8a6b-1c2d3e4f5a6b
+                platform: android
+                appVersion: 0.1.0+1
+      responses:
+        '200':
+          description: Signed in.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerSession'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          description: |
+            `OTP_INVALID`: the code is wrong. `attemptsRemaining` says how many tries are left
+            before the lock.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: https://docs.feengo.invalid/errors/OTP_INVALID
+                title: Wrong code
+                status: 401
+                code: OTP_INVALID
+                requestId: 7d1c9a52-0f3e-4b8a-9c6d-2e1f0a9b8c7d
+                attemptsRemaining: 3
+        '403':
+          description: |
+            Codes: `OTP_DEVICE_MISMATCH` (the installation ID is not the one that asked for the
+            code), `ACCOUNT_SUSPENDED` (an admin has suspended this customer; from S2, A-03).
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: '`OTP_CHALLENGE_NOT_FOUND`: no challenge has this ID.'
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: '`OTP_ALREADY_USED`: the challenge was already used, or a newer code replaced it.'
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '410':
+          description: '`OTP_EXPIRED`: the code is older than the `auth.otp.code_ttl_seconds` setting.'
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '423':
+          $ref: '#/components/responses/OtpLocked'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refreshSession
+      summary: Swap a refresh token for new tokens
+      description: |
+        Used by the app and by the admin website's server. Each refresh token works once: the
+        response carries a new refresh token and the old one stops working (rotation).
+
+        If a refresh token that was already used is presented again after the grace period
+        (config `REFRESH_REUSE_GRACE_SECONDS`, default 10 seconds), the server treats it as
+        stolen and ends the whole session on every device that shares it.
+
+        Clients must send only one refresh at a time.
+      security: []
+      x-roles: [customer, admin]
+      x-rate-limit: 'config: 60 per hour per IP address'
+      x-idempotency-key: not needed. Rotation with a short grace period handles a retried request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: New tokens.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          description: |
+            Codes: `REFRESH_TOKEN_INVALID` (unknown, expired, revoked, or the account was
+            deleted), `REFRESH_TOKEN_REUSED` (an old token was replayed; the session has been
+            ended). Either way the client signs in again.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: '`ACCOUNT_SUSPENDED` or `ADMIN_DISABLED`: the account may no longer sign in.'
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: End the current session
+      description: |
+        Ends the session the access token belongs to: its refresh tokens stop working at once,
+        and its access tokens are refused from that moment, before they expire. Other devices
+        stay signed in. For an admin, the sign-out is written to the activity log (A-11).
+      x-roles: [customer, admin]
+      x-rate-limit: 'config: 60 per hour per user'
+      x-idempotency-key: not needed. Logging out an ended session returns 401, which the client treats as done.
+      responses:
+        '204':
+          description: The session has ended.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/me:
+    get:
+      tags: [me]
+      operationId: getMyProfile
+      summary: Read my profile
+      x-roles: [customer]
+      x-rate-limit: 'config: 120 per minute per user'
+      x-idempotency-key: not needed
+      responses:
+        '200':
+          description: The signed-in customer's profile.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    patch:
+      tags: [me]
+      operationId: updateMyProfile
+      summary: Change my name, email or language
+      description: |
+        Changes only the fields sent (C-04, C-03). Send `email: null` to remove the email.
+        The language is used for messages the server sends, such as notifications from S4 (C-18).
+        The email is stored as given and is not verified in S1.
+      x-roles: [customer]
+      x-rate-limit: 'config: 30 per minute per user'
+      x-idempotency-key: not needed. Sending the same change twice gives the same result.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerUpdate'
+            example:
+              name: Salma Hassan
+              language: ar
+      responses:
+        '200':
+          description: The updated profile.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    delete:
+      tags: [me]
+      operationId: deleteMyAccount
+      summary: Delete my account
+      description: |
+        Deletes the account from inside the app (C-04, Q-07). The server removes the name,
+        email and phone number, marks the customer as deleted, ends every session on every
+        device and removes the customer's devices. Booking and payment records from later slices
+        are kept without personal details.
+
+        The customer must have signed in recently: the access token's sign-in time must be
+        within the `auth.account_deletion.reauth_window_minutes` setting (default 10). If not,
+        the server returns `REAUTH_REQUIRED` and the app asks for a new phone code first.
+
+        Proposal awaiting the owner and a lawyer; see `docs/ARCHITECTURE.md`.
+      x-roles: [customer]
+      x-rate-limit: 'config: 5 per hour per user'
+      x-idempotency-key: not needed. After deletion the token no longer works, so a repeat gets 401.
+      responses:
+        '204':
+          description: The account has been deleted.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: |
+            Codes: `REAUTH_REQUIRED` (sign in again with a new code, then retry),
+            `FORBIDDEN` (the token is not a customer token).
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: https://docs.feengo.invalid/errors/REAUTH_REQUIRED
+                title: Please confirm it is you
+                status: 403
+                code: REAUTH_REQUIRED
+                requestId: 7d1c9a52-0f3e-4b8a-9c6d-2e1f0a9b8c7d
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/admin/auth/sign-in:
+    post:
+      tags: [admin-auth]
+      operationId: adminSignIn
+      summary: Admin step 1, email and password
+      description: |
+        First step of admin sign-in (A-01). A correct email and password return a short-lived,
+        single-use `mfaToken`. No admin endpoint accepts it; it is only good for the second step.
+
+        Wrong passwords count per email address, including addresses with no account, so the
+        response never tells whether an account exists. At the `auth.admin.max_wrong_attempts`
+        setting (default 5) the email is locked for the `auth.admin.lock_minutes` setting
+        (default 15).
+
+        Called by the admin website's server, never by browser scripts.
+      security: []
+      x-roles: [visitor]
+      x-rate-limit: |
+        setting auth.admin.max_wrong_attempts (default 5) wrong passwords per email, then a lock
+        of setting auth.admin.lock_minutes (default 15); config 20 per hour per IP address.
+      x-idempotency-key: not needed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSignInRequest'
+      responses:
+        '200':
+          description: Password accepted. Send the authenticator code next.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMfaChallenge'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          description: '`INVALID_CREDENTIALS`: the email or password is wrong.'
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '423':
+          $ref: '#/components/responses/AdminLocked'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/admin/auth/totp/verify:
+    post:
+      tags: [admin-auth]
+      operationId: adminVerifyTotp
+      summary: Admin step 2, authenticator code
+      description: |
+        Second step of admin sign-in (A-01). Checks the 6-digit code from the admin's
+        authenticator app. On success it returns tokens whose `amr` claim contains `pwd` and
+        `otp`; only such tokens open admin endpoints. A code that was already accepted cannot be
+        used again. Wrong codes count toward the same lock as wrong passwords.
+
+        The successful sign-in is written to the activity log (A-11).
+      security: []
+      x-roles: [visitor]
+      x-rate-limit: |
+        3 wrong codes per mfaToken (then the token ends); wrong codes also count toward
+        setting auth.admin.max_wrong_attempts; config 20 per hour per IP address.
+      x-idempotency-key: not needed. The mfaToken is single-use.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminTotpVerifyRequest'
+      responses:
+        '200':
+          description: Signed in.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSession'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          description: |
+            Codes: `TOTP_INVALID` (wrong or reused code; `attemptsRemaining` says how many tries
+            this mfaToken has left), `MFA_TOKEN_INVALID` (unknown, expired or used up; start
+            again with the password).
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: '`ADMIN_DISABLED`: this admin account has been disabled.'
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '423':
+          $ref: '#/components/responses/AdminLocked'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/admin/me:
+    get:
+      tags: [admin]
+      operationId: getAdminMe
+      summary: Read the signed-in admin
+      description: Lets the admin website show who is signed in after a page reload.
+      x-roles: [admin]
+      x-rate-limit: 'config: 120 per minute per user'
+      x-idempotency-key: not needed
+      responses:
+        '200':
+          description: The signed-in admin.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/admin/activity-log:
+    get:
+      tags: [admin]
+      operationId: listAdminActivity
+      summary: Read the admin activity log
+      description: |
+        Lists admin actions, newest first (A-11). The log is append-only: there is no endpoint
+        to change or delete entries, and the database refuses updates and deletes.
+        Results are paged with an opaque cursor.
+      x-roles: [admin]
+      x-rate-limit: 'config: 60 per minute per user'
+      x-idempotency-key: not needed
+      parameters:
+        - name: limit
+          in: query
+          description: Page size.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: cursor
+          in: query
+          description: The `nextCursor` from the previous page.
+          schema:
+            type: string
+            maxLength: 200
+        - name: actorAdminId
+          in: query
+          description: Only actions by this admin.
+          schema:
+            type: string
+            format: uuid
+        - name: action
+          in: query
+          description: Only this action, for example `admin.signed_in`.
+          schema:
+            $ref: '#/components/schemas/ActivityAction'
+        - name: targetType
+          in: query
+          description: Only actions on this kind of record, for example `admin_user`.
+          schema:
+            type: string
+            pattern: '^[a-z][a-z_]{1,39}$'
+        - name: targetId
+          in: query
+          description: Only actions on this record. Use with `targetType`.
+          schema:
+            type: string
+            maxLength: 64
+        - name: from
+          in: query
+          description: Only actions at or after this time.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Only actions before this time.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: One page of log entries.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityLogPage'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Access token from `verifyOtp`, `adminVerifyTotp` or `refreshSession`, signed with
+        EdDSA (Ed25519), valid for 15 minutes by default. Claims: `sub` (customer or admin ID),
+        `typ` (`customer` or `admin`), `sid` (session ID), `auth_time`, `amr`, `iat`, `exp`,
+        `iss`, `aud`.
+
+  headers:
+    X-Request-Id:
+      description: ID of this request, also written to the server logs. Quote it when reporting a problem.
+      schema:
+        type: string
+        maxLength: 64
+    Retry-After:
+      description: Seconds to wait before trying again.
+      schema:
+        type: integer
+        minimum: 1
+
+  responses:
+    ValidationFailed:
+      description: |
+        `VALIDATION_FAILED`: the request does not match the contract. `errors` lists each field
+        that failed, with a code the client can translate.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://docs.feengo.invalid/errors/VALIDATION_FAILED
+            title: The request is not valid
+            status: 400
+            code: VALIDATION_FAILED
+            requestId: 7d1c9a52-0f3e-4b8a-9c6d-2e1f0a9b8c7d
+            errors:
+              - field: /email
+                code: FORMAT_EMAIL
+    Unauthenticated:
+      description: |
+        `UNAUTHENTICATED`: no access token, or it is invalid, expired, or its session has ended.
+        The app refreshes once and retries; if that fails, it signs in again.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: |
+        Codes: `FORBIDDEN` (this kind of user may not call this endpoint), `MFA_REQUIRED` (an
+        admin token without the second sign-in step), `ACCOUNT_SUSPENDED`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    RateLimited:
+      description: '`RATE_LIMITED`: too many requests. Wait for `Retry-After` seconds.'
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    OtpLocked:
+      description: |
+        `OTP_LOCKED`: too many wrong codes for this phone number. Sign-in is locked for the
+        `auth.otp.lock_minutes` setting. `retryAfterSeconds` says when it opens again.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://docs.feengo.invalid/errors/OTP_LOCKED
+            title: Sign-in is locked for now
+            status: 423
+            code: OTP_LOCKED
+            requestId: 7d1c9a52-0f3e-4b8a-9c6d-2e1f0a9b8c7d
+            retryAfterSeconds: 840
+    AdminLocked:
+      description: |
+        `ADMIN_SIGN_IN_LOCKED`: too many wrong passwords or codes for this email. Locked for the
+        `auth.admin.lock_minutes` setting.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+    Problem:
+      type: object
+      description: |
+        The one error shape for every endpoint (RFC 9457). `code` is stable and is what clients
+        translate; the list of codes is in `ErrorCode`.
+      required: [type, title, status, code, requestId]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: A URI naming the error, ending in the code.
+        title:
+          type: string
+          description: Short English summary, for developers.
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        detail:
+          type: string
+          description: English explanation, for developers. Never shown to users.
+        requestId:
+          type: string
+          maxLength: 64
+        errors:
+          type: array
+          description: Field errors, only with `VALIDATION_FAILED`.
+          items:
+            $ref: '#/components/schemas/FieldError'
+        retryAfterSeconds:
+          type: integer
+          minimum: 1
+          description: With `RATE_LIMITED`, `OTP_RESEND_TOO_SOON`, `OTP_LOCKED` and `ADMIN_SIGN_IN_LOCKED`.
+        attemptsRemaining:
+          type: integer
+          minimum: 0
+          description: With `OTP_INVALID` and `TOTP_INVALID`.
+
+    ErrorCode:
+      type: string
+      description: Every error code the API can return in S0 and S1.
+      enum:
+        - VALIDATION_FAILED
+        - UNAUTHENTICATED
+        - FORBIDDEN
+        - MFA_REQUIRED
+        - RATE_LIMITED
+        - NOT_FOUND
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+        - PHONE_INVALID
+        - PHONE_COUNTRY_NOT_SUPPORTED
+        - OTP_RESEND_TOO_SOON
+        - OTP_DELIVERY_FAILED
+        - OTP_INVALID
+        - OTP_EXPIRED
+        - OTP_ALREADY_USED
+        - OTP_CHALLENGE_NOT_FOUND
+        - OTP_DEVICE_MISMATCH
+        - OTP_LOCKED
+        - REFRESH_TOKEN_INVALID
+        - REFRESH_TOKEN_REUSED
+        - ACCOUNT_SUSPENDED
+        - REAUTH_REQUIRED
+        - INVALID_CREDENTIALS
+        - ADMIN_SIGN_IN_LOCKED
+        - ADMIN_DISABLED
+        - MFA_TOKEN_INVALID
+        - TOTP_INVALID
+
+    FieldError:
+      type: object
+      required: [field, code]
+      properties:
+        field:
+          type: string
+          description: JSON Pointer to the field, for example `/email`.
+        code:
+          type: string
+          description: |
+            Translatable reason, for example `REQUIRED`, `UNKNOWN_FIELD`, `TOO_LONG`,
+            `TOO_SHORT`, `FORMAT_EMAIL`, `FORMAT_UUID`, `NOT_ALLOWED_VALUE`.
+
+    Liveness:
+      type: object
+      required: [status, version, time]
+      properties:
+        status:
+          type: string
+          const: ok
+        version:
+          type: string
+          description: Version of the running API build.
+        time:
+          type: string
+          format: date-time
+
+    Readiness:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+        checks:
+          type: object
+          required: [database, redis]
+          properties:
+            database:
+              $ref: '#/components/schemas/DependencyStatus'
+            redis:
+              $ref: '#/components/schemas/DependencyStatus'
+
+    DependencyStatus:
+      type: string
+      enum: [up, down]
+
+    Language:
+      type: string
+      description: User interface language. English is the default.
+      enum: [en, ar]
+      default: en
+
+    PhoneNumber:
+      type: string
+      description: E.164 mobile number.
+      pattern: '^\+[1-9][0-9]{7,14}$'
+      examples:
+        - '+201001234567'
+
+    InstallationId:
+      type: string
+      format: uuid
+      description: |
+        Random ID the app makes on first launch and keeps in secure storage. Not a hardware ID.
+        Used to rate-limit codes per device and to name the device's session.
+
+    OtpRequest:
+      type: object
+      additionalProperties: false
+      required: [phone, installationId]
+      properties:
+        phone:
+          $ref: '#/components/schemas/PhoneNumber'
+        installationId:
+          $ref: '#/components/schemas/InstallationId'
+        language:
+          $ref: '#/components/schemas/Language'
+        channel:
+          type: string
+          description: |
+            `auto` sends by WhatsApp and falls back to SMS. `sms` skips WhatsApp, for a customer
+            who tapped "send by SMS instead" on a resend.
+          enum: [auto, sms]
+          default: auto
+
+    OtpChallenge:
+      type: object
+      required: [challengeId, channel, codeLength, expiresAt, resendAvailableAt]
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+        channel:
+          type: string
+          description: The channel the code was sent on.
+          enum: [whatsapp, sms]
+        codeLength:
+          type: integer
+          const: 6
+        expiresAt:
+          type: string
+          format: date-time
+        resendAvailableAt:
+          type: string
+          format: date-time
+
+    OtpVerifyRequest:
+      type: object
+      additionalProperties: false
+      required: [challengeId, code, device]
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+        device:
+          $ref: '#/components/schemas/DeviceInfo'
+
+    DeviceInfo:
+      type: object
+      additionalProperties: false
+      required: [installationId, platform, appVersion]
+      properties:
+        installationId:
+          $ref: '#/components/schemas/InstallationId'
+        platform:
+          type: string
+          enum: [ios, android]
+        appVersion:
+          type: string
+          description: App version and build, for example `1.4.0+27`.
+          maxLength: 32
+          pattern: '^[0-9]+\.[0-9]+\.[0-9]+(\+[0-9]+)?$'
+
+    RefreshRequest:
+      type: object
+      additionalProperties: false
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          minLength: 20
+          maxLength: 200
+          writeOnly: true
+
+    TokenPair:
+      type: object
+      required: [accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt]
+      properties:
+        accessToken:
+          type: string
+          description: 'JWT for the `Authorization: Bearer` header.'
+        accessTokenExpiresAt:
+          type: string
+          format: date-time
+        refreshToken:
+          type: string
+          description: Opaque, single-use. Keep it in secure storage (app) or an HttpOnly cookie (website server).
+        refreshTokenExpiresAt:
+          type: string
+          format: date-time
+
+    CustomerSession:
+      type: object
+      required: [tokens, customer, isNewCustomer]
+      properties:
+        tokens:
+          $ref: '#/components/schemas/TokenPair'
+        customer:
+          $ref: '#/components/schemas/Customer'
+        isNewCustomer:
+          type: boolean
+          description: True when this sign-in created the account. The app then asks for a name.
+
+    Customer:
+      type: object
+      required: [id, phone, name, email, language, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        phone:
+          $ref: '#/components/schemas/PhoneNumber'
+        name:
+          type: [string, 'null']
+          description: Empty until the customer gives it.
+          maxLength: 80
+        email:
+          type: [string, 'null']
+          format: email
+          maxLength: 254
+        language:
+          $ref: '#/components/schemas/Language'
+        createdAt:
+          type: string
+          format: date-time
+
+    CustomerUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Trimmed by the server. Cannot be removed once set, only changed.
+        email:
+          type: [string, 'null']
+          format: email
+          maxLength: 254
+          description: Stored in lower case. `null` removes it.
+        language:
+          $ref: '#/components/schemas/Language'
+
+    AdminSignInRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 200
+          writeOnly: true
+
+    AdminMfaChallenge:
+      type: object
+      required: [mfaToken, mfaTokenExpiresAt]
+      properties:
+        mfaToken:
+          type: string
+          description: Opaque, single-use, valid for 5 minutes. Only for `adminVerifyTotp`.
+        mfaTokenExpiresAt:
+          type: string
+          format: date-time
+
+    AdminTotpVerifyRequest:
+      type: object
+      additionalProperties: false
+      required: [mfaToken, code]
+      properties:
+        mfaToken:
+          type: string
+          minLength: 20
+          maxLength: 200
+          writeOnly: true
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+
+    AdminSession:
+      type: object
+      required: [tokens, admin]
+      properties:
+        tokens:
+          $ref: '#/components/schemas/TokenPair'
+        admin:
+          $ref: '#/components/schemas/AdminUser'
+
+    AdminUser:
+      type: object
+      required: [id, email, name, role]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          description: One role in S1. More may be added later.
+          enum: [admin]
+
+    ActivityAction:
+      type: string
+      description: |
+        Actions logged in S1. Each later slice adds its own, for example `venue.approved` (S2)
+        or `booking.refunded` (S6).
+      enum:
+        - admin.created
+        - admin.signed_in
+        - admin.signed_out
+        - admin.sign_in_failed
+        - admin.locked
+        - admin.totp_reset
+        - admin.disabled
+
+    ActivityLogEntry:
+      type: object
+      required: [id, occurredAt, actorType, actorAdminId, action, targetType, targetId, reason, details]
+      properties:
+        id:
+          type: string
+          description: Increasing ID of the entry, as a string.
+          pattern: '^[0-9]+$'
+        occurredAt:
+          type: string
+          format: date-time
+        actorType:
+          type: string
+          description: '`admin` for an action in the back office, `system` for a server command such as the admin seed.'
+          enum: [admin, system]
+        actorAdminId:
+          type: [string, 'null']
+          format: uuid
+        actorAdminName:
+          type: [string, 'null']
+        action:
+          $ref: '#/components/schemas/ActivityAction'
+        targetType:
+          type: [string, 'null']
+          description: Kind of record acted on, for example `admin_user`.
+        targetId:
+          type: [string, 'null']
+        reason:
+          type: [string, 'null']
+          description: The written reason, where the PRD requires one.
+        details:
+          type: object
+          description: Extra facts, such as old and new values. Never holds passwords, codes or tokens.
+          additionalProperties: true
+
+    ActivityLogPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivityLogEntry'
+        nextCursor:
+          type: [string, 'null']
+          description: Pass as `cursor` to get the next page. `null` on the last page.
