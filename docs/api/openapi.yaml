@@ -354,7 +354,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
         '409':
-          description: '`OTP_ALREADY_USED`: the challenge was already used, or a newer code replaced it.'
+          description: |
+            `OTP_ALREADY_USED`: the challenge was already used, or a newer code replaced it. This
+            never counts as a wrong code and never locks the phone, so a retried successful
+            verify is safe.
           headers:
             X-Request-Id:
               $ref: '#/components/headers/X-Request-Id'
@@ -850,21 +853,21 @@ components:
         Sent only by the FeenGo website servers: the browser's IP address, taken from the
         website host's trusted proxy hops. The API uses it for rate limits only when
         `X-FeenGo-Forwarding-Key` is valid, and ignores it otherwise. The website servers strip
-        any copy a browser sends. The app never sends it.
+        any copy a browser sends. The app never sends it. Not validated: a missing, malformed or
+        untrusted value is ignored and never causes a 400.
       schema:
         type: string
-        maxLength: 45
     XFeenGoForwardingKey:
       name: X-FeenGo-Forwarding-Key
       in: header
       required: false
       description: |
         Sent only by the FeenGo website servers: a secret shared with the API, one per website,
-        that makes `X-FeenGo-Client-IP` trusted. Never logged. The app never sends it.
+        that makes `X-FeenGo-Client-IP` trusted. Never logged. The app never sends it. Not
+        validated beyond the key comparison: a missing or wrong key is ignored and never causes
+        a 400.
       schema:
         type: string
-        minLength: 32
-        maxLength: 128
 
   securitySchemes:
     bearerAuth:

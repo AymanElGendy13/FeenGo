@@ -528,7 +528,7 @@ Every counter and every "only once" rule is a single atomic operation. Where eac
 | --- | --- | --- |
 | Wrong codes per phone (C-02's five tries) | Redis `otp:fail:{hmac(phone)}`, window = `auth.otp.lock_minutes` from the first wrong code | One Lua script, run **before** the code is compared: if `otp:lock:{hmac}` exists, return locked; otherwise `INCR` the counter (setting its expiry on the first increment); if the result is above `auth.otp.max_wrong_attempts`, set the lock and return locked. Only then is the code compared. A correct code deletes the counter. Because the attempt is counted before comparing, parallel guesses can never get more than the allowed number of comparisons. |
 | The lock | Redis `otp:lock:{hmac(phone)}` with expiry `auth.otp.lock_minutes` | Set when a wrong code is the one that reached the limit (that request answers `423 OTP_LOCKED`), and by the script itself for any parallel attempt counted beyond the limit |
-| Attempts per challenge | Postgres `otp_challenges.attempt_count` | Reserved **before** the code is compared, right after the Redis script: `UPDATE otp_challenges SET attempt_count = attempt_count + 1 WHERE id = $1 AND attempt_count < $max AND consumed_at IS NULL RETURNING attempt_count`. No row returned: the challenge is used up, so the API ends it, sets the Redis lock again and answers `423 OTP_LOCKED`. On a correct code the reservation is simply left in place, because the challenge is consumed anyway. A second cap that does not depend on Redis, and that parallel guesses cannot exceed. |
+| Attempts per challenge | Postgres `otp_challenges.attempt_count` | Reserved **before** the code is compared, right after the Redis script: `UPDATE otp_challenges SET attempt_count = attempt_count + 1 WHERE id = $1 AND attempt_count < $max AND consumed_at IS NULL RETURNING attempt_count`. No row returned: the API reads the row once and answers by its state, never locking a used or expired challenge (see "When the reservation returns no row" below the table). On a correct code the reservation is simply left in place, because the challenge is consumed anyway. A second cap that does not depend on Redis, and that parallel guesses cannot exceed. |
 | A code works once | Postgres `otp_challenges.consumed_at` | `UPDATE otp_challenges SET consumed_at = now() WHERE id = $1 AND consumed_at IS NULL AND expires_at > now() RETURNING id`, run only after the code matched. No row returned: the API reads the row once more to answer `409 OTP_ALREADY_USED` or `410 OTP_EXPIRED`. |
 | One code at a time per phone | Redis `otp:cooldown:{hmac(phone)}` | `SET ... NX EX <auth.otp.resend_cooldown_seconds>`. Only one of two parallel requests gets through; the other gets `429 OTP_RESEND_TOO_SOON`. After a channel accepts the message, one statement ends the earlier open challenges: `UPDATE ... SET consumed_at = now() WHERE phone_e164 = $1 AND consumed_at IS NULL AND id <> $new`. |
 | Requests per phone and per device | Redis `rl:otp:phone:...`, `rl:otp:device:...`, one hour | The rate limiter's script (section 7.4) |
@@ -536,6 +536,14 @@ Every counter and every "only once" rule is a single atomic operation. Where eac
 | One customer per phone | Postgres `customers` partial unique index | `INSERT INTO customers (phone_e164, language) VALUES ($1, $2) ON CONFLICT (phone_e164) WHERE phone_e164 IS NOT NULL DO UPDATE SET last_signed_in_at = now() RETURNING id, (xmax = 0) AS inserted`. Two first sign-ins at the same moment give one customer; `inserted` says whether it is new. |
 | One device row per installation | Postgres `devices` unique `(customer_id, installation_id)` | `INSERT ... ON CONFLICT (customer_id, installation_id) DO UPDATE SET last_seen_at = now(), app_version = EXCLUDED.app_version` |
 | Admin sign-in failures | Postgres `admin_sign_in_attempts` | Single-statement upsert (section 5.3) |
+
+**When the reservation returns no row**, the API reads the challenge once and answers by its state, in this order:
+
+- `consumed_at` is set (used, replaced by a newer code, or ended): `409 OTP_ALREADY_USED`, **no lock**.
+- `expires_at` has passed: `410 OTP_EXPIRED`, no lock.
+- Only when `attempt_count >= max`: the API ends the challenge, sets the Redis lock again and answers `423 OTP_LOCKED`.
+
+In the 409 and 410 cases nothing was compared, so the API also takes back this request's Redis per-phone increment (decrement only if the key still exists and is above zero). A retried request can therefore never lock the phone.
 
 **If Redis loses data** (a restart that loses the last second of writes, a failover, or a flush):
 
@@ -555,6 +563,7 @@ Every counter and every "only once" rule is a single atomic operation. Where eac
 - `C-02 two parallel first sign-ins for a new phone create one customer`
 - `C-02 parallel guesses at one challenge after Redis is flushed get at most five comparisons` (20 guesses sent at once, after `FLUSHALL`)
 - `C-02 a code request that both channels refuse leaves no cooldown and no count, and the earlier code still works`
+- `C-02 a retried successful verify gets 409 and does not lock the phone` (the same correct verify sent six times after it succeeded, and a verify against a replaced challenge: each answers 409, the phone's count is unchanged, and a new code still works)
 - `C-02 code request and check answer 503 when Redis is down`
 
 ## 8. Sessions and tokens
@@ -611,7 +620,7 @@ A check in a shared layout is **not** enough: when the user navigates inside the
 2. **`requireAdmin()`**, one shared server-only function in admin-web, is called at the top of **every** admin page, every server action and every route handler that serves signed-in users, not in a layout. It repeats the same JWT checks, so a page is safe even if the proxy were skipped (Next.js has had bugs that let requests bypass its middleware). On pages it also calls `GET /v1/admin/me`, which adds the API's own checks, including the deny-list of ended sessions, and returns the admin shown in the header. If either check fails it redirects to sign-in; in server actions and route handlers it answers 401.
 3. **The API** checks every call itself: signature, expiry, deny-list, role and the second sign-in step. Pages get their data only through the API, so even a page that rendered by mistake would have no admin data to show.
 
-If the owner refuses `GET /v1/admin/me` (question 15), nothing else changes: `requireAdmin()` relies on its local JWT check, the admin's name comes from the token's claims, and a session ended less than 15 minutes ago can at most render an empty page frame, because every data call to the API is refused.
+If the owner refuses `GET /v1/admin/me` (question 15), nothing else changes: `requireAdmin()` relies on its local JWT check, the header shows no admin name (access tokens carry no name claim, by design, to keep personal data out of tokens), and a session ended less than 15 minutes ago can at most render an empty page frame, because every data call to the API is refused.
 
 - Server actions and route handlers that change data send the access token to the API, which checks it again.
 - CSRF: `SameSite=Strict`, plus a check of the `Origin` header on every state-changing route handler (Next.js server actions already check it).
@@ -901,7 +910,17 @@ All checked on **2026-11-18** from the sources the owner named: npm registry met
 - **ESLint 9 is past end of life.** ESLint's own version-support table (`src/content/pages/version-support.md` in the eslint/eslint.org repository, read 2026-11-18) lists v9.0.0 to v9.39.5 as EOL, last release 2026-07-10, end of life 2026-08-06. npm's `maintenance` tag still points to 9.39.5, but no further 9.x fixes will come. Pinning it would mean starting on an unsupported linter.
 - **The conflict:** eslint-config-next 16.4.6 depends on `eslint-plugin-react` 7.37.5, `eslint-plugin-jsx-a11y` 6.10.2 and `eslint-plugin-import` 2.32.0, whose ESLint peer ranges stop at `^9`. `eslint-plugin-react-hooks` 7.1.1 and typescript-eslint 8.73.0 already accept `^10`.
 - **Checked on 2026-11-18:** in a throwaway folder I installed next 16.4.6, eslint-config-next 16.4.6 and TypeScript 6.0.3 with ESLint 10.15.0, then with 9.39.5, and linted the same sample files with `core-web-vitals` and `typescript` configs. Both versions gave identical results, including rules from each of the three capped plugins (`react/jsx-key`, `import/no-anonymous-default-export`, `jsx-a11y/alt-text`), `react-hooks/rules-of-hooks`, `@next/next/no-img-element` and `@typescript-eslint/no-unused-vars`. No crashes.
-- **So:** ESLint 10.15.0 everywhere. C1 records the override in the root `package.json` (`pnpm.peerDependencyRules.allowedVersions` with `eslint: 10` for exactly those three plugins), so the install is clean and the exception is visible. C8 must still prove that lint runs cleanly with these pins and record it in the pull request.
+- **So:** ESLint 10.15.0 everywhere. C1 records the override in `pnpm-workspace.yaml`, because pnpm 12 no longer reads the `pnpm` field of `package.json`:
+
+  ```yaml
+  peerDependencyRules:
+    allowedVersions:
+      eslint-plugin-react>eslint: "10"
+      eslint-plugin-jsx-a11y>eslint: "10"
+      eslint-plugin-import>eslint: "10"
+  ```
+
+  With that, `pnpm peers check` reports no peer issues (confirmed by the reviewer), the install is clean and the exception is visible. C8 must still prove that lint runs cleanly with these pins and record it in the pull request.
 - **Trigger to remove the override:** when all three plugins declare ESLint 10 in their peer ranges, or when a new eslint-config-next drops them, release-manager deletes the override in a dependency pull request. If any rule from them crashes under ESLint 10 before then, the fallback is to switch that rule off in the shared config and note it, not to return to an unsupported ESLint 9.
 
 ## 18. Dependency list per app
@@ -1074,6 +1093,12 @@ GitHub Actions maintained by GitHub (`actions/checkout`, `actions/setup-node`, `
 - **CI secrets** (store credentials later, deploy tokens) live in GitHub Environments (`staging`, `production`); production requires the owner's approval to deploy.
 - **Runtime secrets** live in the host's secret store (section 20) and reach containers as environment variables.
 - Rotation: JWT keys and TOTP encryption keys support several keys at once by ID, so they rotate without signing anyone out. Peppers rotate only with a planned migration.
+- **JWT signing-key rotation, in this order**, because the website servers verify tokens themselves with `JWT_VERIFY_KEYS`:
+  1. Make the new Ed25519 key pair. Add its public key to `JWT_VERIFY_KEYS` on every website server and to the API's verify list, keeping the old one, and deploy. Nothing signs with the new key yet.
+  2. Switch the API to sign with the new key (`kid` in the header) and deploy. Tokens signed with either key now verify everywhere.
+  3. After at least one access-token lifetime (15 minutes) plus a margin, remove the old public key from the websites and the API.
+
+  Skipping step 1 would make the websites reject every new token. If manual rotation becomes a burden, the API can later publish a JWKS endpoint that the websites fetch; that would be a contract change.
 
 ## 20. Hosting options
 
