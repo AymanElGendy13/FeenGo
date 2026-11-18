@@ -84,12 +84,11 @@ node_setup() (
   [ -f "$nvmrc" ] || exit 0
   # Read at most 33 bytes, and never print what the file holds. A file of
   # 33 bytes or more is longer than any version line, so it is rejected.
-  raw="$(head -c 33 "$nvmrc" 2>/dev/null)"
-  if [ "${#raw}" -ge 33 ]; then
+  if [ "$(head -c 33 "$nvmrc" 2>/dev/null | wc -c)" -ge 33 ]; then
     echo "session-start: .nvmrc does not hold an exact version like 26.13.1, so Node was not set up. Install the right Node by hand."
     exit 0
   fi
-  ver="$(printf '%s' "$raw" | tr -d '[:space:]')"
+  ver="$(head -c 33 "$nvmrc" 2>/dev/null | tr -d '[:space:]')"
   ver="${ver#v}"
   if ! [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "session-start: .nvmrc does not hold an exact version like 26.13.1, so Node was not set up. Install the right Node by hand."
