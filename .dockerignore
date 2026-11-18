@@ -1,10 +1,13 @@
 # Keeps the Docker build context small and free of secrets. Images are built from
 # the repository root: docker build -f apps/api/Dockerfile .
 
-# Secrets: never inside an image. .env.example holds placeholders only.
-.env
-.env.*
-!.env.example
+# Secrets: never inside an image, at any depth (a bare `.env` would match only the
+# context root). .env.example holds placeholders only.
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
 **/*.keystore
 **/*.jks
 **/*.p12
