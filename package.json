@@ -1,0 +1,22 @@
+{
+  "name": "feengo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "FeenGo workspace root: shared scripts and dev tools only.",
+  "packageManager": "pnpm@12.21.0",
+  "engines": {
+    "node": "26.13.1"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@redocly/cli": "2.80.0",
+    "eslint": "10.15.0",
+    "prettier": "3.10.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.73.0"
+  }
+}
