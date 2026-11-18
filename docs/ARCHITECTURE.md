@@ -221,6 +221,16 @@ In order, for every request:
 - **Per-IP limits are high ceilings against abuse, not everyday limits.** Many Egyptian mobile customers share one carrier IP address, so the everyday limits are per phone, per device, per email or per session (sections 7 and 8), and the per-IP numbers in the contract are set well above what a busy carrier address sends.
 - Health probes are not limited per IP in practice: their ceilings in the contract are far above what probes send, and readiness results are cached for 1 second so a flood never reaches the database.
 
+### 4.7 Tracked follow-ups from C2
+
+These are notes raised in the C2 review, not decisions. Each one is settled at the point named.
+
+- **Before the first S1 `POST`: 413 and 415.** Declare `413` (payload too large) and `415` (unsupported media type) responses in the contract, and decide whether 413 keeps `VALIDATION_FAILED` or gets its own code. That is a contract change. Until then, C2 returns 413 with `VALIDATION_FAILED` under the `default` response.
+- **Before S1's first query that uses request data: error messages that contain input values.** Section 4.5 needs a rule for errors whose message repeats an input value, such as PostgreSQL's "invalid input syntax …: <value>" and V8's JSON `SyntaxError`. For example, for `DatabaseError`, keep the SQLSTATE, table, column and constraint, and replace the message with fixed text.
+- **By C3 or S1: health-probe log volume.** Log health 2xx at `debug` and readiness 503 at `warn`.
+- **Before the first table (C4 or S1): narrowed Kysely typing per module.** Section 4.2 gives each module a `Kysely<Pick<Database, ...>>` with only its own tables. Today core exports the full `Kysely<Database>`.
+- **For the Dockerfile in C3.** `.dockerignore` must exclude `.env`. The image must keep `package.json` next to `dist/`, because the API reads its version from it.
+
 ## 5. Database: access layer, migrations and data model
 
 ### 5.1 Access layer and migrations: Kysely

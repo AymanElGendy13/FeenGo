@@ -94,6 +94,12 @@ paths:
                 status: ok
                 version: 0.1.0
                 time: '2026-11-18T10:00:00Z'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+          description: |
+            `VALIDATION_FAILED`: the request has a query parameter. This endpoint takes none, so
+            every query parameter is unknown and is listed in `errors` with the field code
+            `UNKNOWN_FIELD`.
         '429':
           $ref: '#/components/responses/RateLimited'
         default:
@@ -127,6 +133,12 @@ paths:
                 checks:
                   database: up
                   redis: up
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+          description: |
+            `VALIDATION_FAILED`: the request has a query parameter. This endpoint takes none, so
+            every query parameter is unknown and is listed in `errors` with the field code
+            `UNKNOWN_FIELD`.
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
