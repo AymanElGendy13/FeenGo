@@ -111,6 +111,51 @@ jobs:
           FEENGO_APP_PASSWORD: ci-app-password
         run: ./docker/postgres/initdb/01-create-roles.sh
 
+      # Migrations: up, down to zero, up again on the empty database, then
+      # regenerate the types and fail if they differ from the committed file
+      # (section 5.1). Each step connects as feengo_migrator with the throwaway
+      # CI password set in "Create the database roles" above, not a secret.
+      # APP_ENV=test is what allows the down step; the deploy pipeline only
+      # ever runs latest.
+      - name: Migrate up
+        env:
+          APP_ENV: test
+          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@localhost:5432/feengo
+        run: pnpm --filter @feengo/api db:migrate
+
+      - name: Migrate down to zero
+        env:
+          APP_ENV: test
+          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@localhost:5432/feengo
+        run: pnpm --filter @feengo/api db:migrate:down-all
+
+      - name: Migrate up again
+        env:
+          APP_ENV: test
+          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@localhost:5432/feengo
+        run: pnpm --filter @feengo/api db:migrate
+
+      - name: Regenerate database types
+        env:
+          APP_ENV: test
+          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@localhost:5432/feengo
+        run: pnpm --filter @feengo/api db:types
+
+      - name: Check generated types are up to date
+        env:
+          APP_ENV: test
+          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@localhost:5432/feengo
+        # git diff ignores untracked files, so first check the file is committed.
+        run: |
+          if ! git ls-files --error-unmatch apps/api/src/database/schema.generated.ts > /dev/null 2>&1; then
+            echo "::error file=apps/api/src/database/schema.generated.ts::schema.generated.ts is not committed. Run 'pnpm --filter @feengo/api db:types' against a migrated local database and commit the result."
+            exit 1
+          fi
+          if ! git diff --exit-code -- apps/api/src/database/schema.generated.ts; then
+            echo "::error file=apps/api/src/database/schema.generated.ts::schema.generated.ts does not match the migrated database. Run 'pnpm --filter @feengo/api db:types' against a migrated local database and commit the result."
+            exit 1
+          fi
+
       # ESLint 10 uses the config nearest to each file, so this also applies
       # apps/api/eslint.config.mjs (module boundaries) to the API.
       - name: Lint
