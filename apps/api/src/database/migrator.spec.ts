@@ -61,4 +61,12 @@ describe('migrator configuration', () => {
       'auth failed with [redacted] and [redacted]',
     );
   });
+
+  it('S0 a password with a malformed percent sequence is still redacted', () => {
+    const url = 'postgres://feengo_migrator:a%zz@127.0.0.1:5432/feengo';
+    expect(new URL(url).password).toBe('a%zz');
+    const redact = redactor(url);
+    expect(redact('password a%zz was rejected')).toBe('password [redacted] was rejected');
+    expect(redact(`while connecting to ${url}`)).toBe('while connecting to [redacted]');
+  });
 });

@@ -5,6 +5,10 @@
 //                                            (pnpm db:migrate:down-all)
 //
 // It connects as feengo_migrator through DATABASE_MIGRATOR_URL, never as the app role.
+// Kysely's own history tables (kysely_migration, kysely_migration_lock) live in the
+// schema feengo_migrations, not in public: the app role's default privileges apply in
+// public, and the app must never be able to rewrite which migrations have run. Kysely
+// creates the schema on first run, owned by the migrator, with no grant to anyone.
 // It runs from source with Node 26's built-in type stripping, and from dist/ after
 // `nest build` as plain JavaScript. Type stripping resolves import paths exactly as
 // written, so this file and the migrations import packages only, never another
@@ -32,6 +36,9 @@ export type MigratorAppEnv = (typeof APP_ENVS)[number];
 
 /** Down migrations are blocked outside development (section 5.1). */
 const DOWN_ALLOWED_ENVS: readonly MigratorAppEnv[] = ['local', 'test'];
+
+/** Where Kysely keeps its migration history; the app role has no USAGE on it. */
+export const MIGRATION_TABLE_SCHEMA = 'feengo_migrations';
 
 export const MIGRATIONS_FOLDER = fileURLToPath(new URL('./migrations/', import.meta.url));
 
@@ -143,7 +150,7 @@ export function migrationProvider(folder: string = MIGRATIONS_FOLDER): Migration
 }
 
 export interface MigratorOptions {
-  /** Schema of Kysely's own migration tables; `public` unless a test isolates itself. */
+  /** Schema of Kysely's own migration tables; feengo_migrations unless a test isolates itself. */
   migrationTableSchema?: string;
   folder?: string;
 }
@@ -153,7 +160,7 @@ export function createMigrator(db: Kysely<any>, options: MigratorOptions = {}): 
   return new Migrator({
     db,
     provider: migrationProvider(options.folder),
-    migrationTableSchema: options.migrationTableSchema ?? 'public',
+    migrationTableSchema: options.migrationTableSchema ?? MIGRATION_TABLE_SCHEMA,
   });
 }
 
@@ -185,13 +192,20 @@ export async function runMigrations(
 /** Replaces the connection URL and its password wherever they appear in a message. */
 export function redactor(databaseUrl: string): (text: string) => string {
   const secrets = [databaseUrl];
+  let password = '';
   try {
-    const { password } = new URL(databaseUrl);
-    if (password !== '') {
-      secrets.push(password, decodeURIComponent(password));
-    }
+    password = new URL(databaseUrl).password;
   } catch {
     // The URL was validated before; nothing more to hide.
+  }
+  if (password !== '') {
+    // The raw form first, so a malformed % sequence below cannot lose it.
+    secrets.push(password);
+    try {
+      secrets.push(decodeURIComponent(password));
+    } catch {
+      // Not valid percent-encoding: the raw form is all there is.
+    }
   }
   return (text) =>
     secrets

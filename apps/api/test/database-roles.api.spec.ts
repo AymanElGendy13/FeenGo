@@ -113,4 +113,42 @@ describe('database roles', () => {
       database_temporary: false,
     });
   });
+
+  it('S0 the app role cannot read or change the migration history', async () => {
+    const all = 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER';
+    const { rows } = await sql<Record<string, boolean | string | null>>`
+      SELECT
+        (SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname = 'feengo_migrations')
+          AS schema_owner,
+        has_schema_privilege('feengo_app', 'feengo_migrations', 'USAGE') AS schema_usage,
+        has_schema_privilege('feengo_app', 'feengo_migrations', 'CREATE') AS schema_create,
+        has_table_privilege('feengo_app', 'feengo_migrations.kysely_migration', ${all})
+          AS migration_any,
+        has_table_privilege('feengo_app', 'feengo_migrations.kysely_migration_lock', ${all})
+          AS migration_lock_any,
+        to_regclass('public.kysely_migration')::text AS public_migration,
+        to_regclass('public.kysely_migration_lock')::text AS public_migration_lock
+    `.execute(migrator);
+    expect(rows[0]).toEqual({
+      schema_owner: 'feengo_migrator',
+      schema_usage: false,
+      schema_create: false,
+      migration_any: false,
+      migration_lock_any: false,
+      public_migration: null,
+      public_migration_lock: null,
+    });
+
+    // And in practice, as the app role.
+    for (const query of [
+      sql`SELECT * FROM feengo_migrations.kysely_migration`,
+      sql`DELETE FROM feengo_migrations.kysely_migration`,
+      sql`UPDATE feengo_migrations.kysely_migration_lock SET is_locked = 0`,
+    ]) {
+      expect(await violation(query.execute(app))).toEqual({
+        code: INSUFFICIENT_PRIVILEGE,
+        constraint: undefined,
+      });
+    }
+  });
 });

@@ -10,8 +10,42 @@ const LOCAL_MIGRATOR_URL =
   'postgres://feengo_migrator:local-migrator-password@127.0.0.1:5432/feengo';
 const LOCAL_APP_URL = 'postgres://feengo_app:local-app-password@127.0.0.1:5432/feengo';
 
-export const migratorUrl = (): string => process.env.DATABASE_MIGRATOR_URL ?? LOCAL_MIGRATOR_URL;
-export const appUrl = (): string => process.env.DATABASE_URL ?? LOCAL_APP_URL;
+const SAFE_APP_ENVS = ['test', 'local'];
+const SAFE_HOSTS = ['localhost', '127.0.0.1'];
+
+/**
+ * These tests create and drop schemas and migrate the database, so they refuse to
+ * run anywhere but a local or CI database: APP_ENV must be test or local (unset
+ * counts as local, as in src/main.ts), and the database host must be this machine.
+ */
+export function assertSafeTestDatabase(name: string, url: string): string {
+  const appEnv = process.env.APP_ENV ?? 'local';
+  if (!SAFE_APP_ENVS.includes(appEnv)) {
+    throw new Error(
+      `Database tests refuse to run: APP_ENV is ${appEnv}; they run only when it is test or local.`,
+    );
+  }
+  let host = '';
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    // Reported below without the URL, which may hold a password.
+  }
+  if (!SAFE_HOSTS.includes(host)) {
+    throw new Error(
+      `Database tests refuse to run: ${name} must point at ${SAFE_HOSTS.join(' or ')}.`,
+    );
+  }
+  return url;
+}
+
+export const migratorUrl = (): string =>
+  assertSafeTestDatabase(
+    'DATABASE_MIGRATOR_URL',
+    process.env.DATABASE_MIGRATOR_URL ?? LOCAL_MIGRATOR_URL,
+  );
+export const appUrl = (): string =>
+  assertSafeTestDatabase('DATABASE_URL', process.env.DATABASE_URL ?? LOCAL_APP_URL);
 
 /** Kysely over a small pool; `searchPath` points unqualified names at one schema. */
 export function connect(url: string, searchPath?: string): Kysely<Database> {

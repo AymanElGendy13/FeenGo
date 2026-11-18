@@ -125,6 +125,34 @@ describe('settings migration', () => {
     expect(await schema.db.selectFrom('settings').selectAll().execute()).toEqual([]);
   });
 
+  it('R-01 the settings indexes are exactly the ones section 6.1 describes', async () => {
+    const { rows } = await sql<{ indexname: string; indexdef: string }>`
+      SELECT indexname, indexdef FROM pg_indexes
+      WHERE schemaname = ${schema.name} AND tablename = 'settings'
+      ORDER BY indexname
+    `.execute(schema.db);
+    const on = `ON ${schema.name}.settings USING btree`;
+    expect(rows).toEqual([
+      { indexname: 'settings_pkey', indexdef: `CREATE UNIQUE INDEX settings_pkey ${on} (id)` },
+      {
+        indexname: 'settings_platform_key_category_uq',
+        indexdef:
+          `CREATE UNIQUE INDEX settings_platform_key_category_uq ${on} ` +
+          "(key, booking_category_id) NULLS NOT DISTINCT WHERE (scope = 'platform'::text)",
+      },
+      {
+        indexname: 'settings_venue_id_idx',
+        indexdef: `CREATE INDEX settings_venue_id_idx ${on} (venue_id) WHERE (scope = 'venue'::text)`,
+      },
+      {
+        indexname: 'settings_venue_key_venue_category_uq',
+        indexdef:
+          `CREATE UNIQUE INDEX settings_venue_key_venue_category_uq ${on} ` +
+          "(key, venue_id, booking_category_id) NULLS NOT DISTINCT WHERE (scope = 'venue'::text)",
+      },
+    ]);
+  });
+
   it('R-01 a new setting row gets a generated id, version 1 and timestamps by default', async () => {
     const key = await defineSetting();
     const row = await insertSetting(platformRow(key));
