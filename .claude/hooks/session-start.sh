@@ -72,12 +72,21 @@ node_setup() (
   # start of the hook, so the git step's time is included; stop well before 60.
   budget=50
 
+  cache_root="${HOME:-/root}/.cache/feengo-node"
+  # A run killed outright (SIGKILL) skips its cleanup trap and can leave an
+  # unpacked build of about 230 MB behind. No live run lasts 10 minutes.
+  if [ -d "$cache_root" ]; then
+    find "$cache_root" -mindepth 1 -maxdepth 1 -type d -name '.tmp.*' -mmin +10 \
+      -exec rm -rf {} + 2>/dev/null
+  fi
+
   nvmrc="${CLAUDE_PROJECT_DIR:-.}/.nvmrc"
   [ -f "$nvmrc" ] || exit 0
-  ver="$(tr -d '[:space:]' < "$nvmrc")"
+  # Read only the first 32 bytes, and never print what the file holds.
+  ver="$(head -c 32 "$nvmrc" 2>/dev/null | tr -d '[:space:]')"
   ver="${ver#v}"
   if ! [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "session-start: .nvmrc holds '$ver', which is not an exact version like 26.13.1; Node was not set up. Install the right Node by hand."
+    echo "session-start: .nvmrc does not hold an exact version like 26.13.1, so Node was not set up. Install the right Node by hand."
     exit 0
   fi
   if [ "$(node -v 2>/dev/null)" = "v$ver" ]; then
@@ -93,7 +102,6 @@ node_setup() (
   fi
   plat="linux-x64"
 
-  cache_root="${HOME:-/root}/.cache/feengo-node"
   cache="$cache_root/$ver"
   state="cached"
 
@@ -101,6 +109,12 @@ node_setup() (
     state="downloaded"
     dist="${FEENGO_NODE_DIST_URL:-https://nodejs.org/dist}/v$ver"
     file="node-v$ver-$plat.tar.xz"
+    # The real source is HTTPS only, redirects included. The test override may
+    # use file:// or plain http to a local server.
+    proto=()
+    if [ -z "${FEENGO_NODE_DIST_URL:-}" ]; then
+      proto=(--proto '=https' --proto-redir '=https')
+    fi
 
     if ! mkdir -p "$cache_root" 2>/dev/null; then
       echo "session-start: could not create $cache_root, so Node $ver was not installed; $manual."
@@ -120,7 +134,7 @@ node_setup() (
       exit 0
     fi
 
-    if ! curl --fail --silent --show-error --location --connect-timeout 5 --max-time 10 \
+    if ! curl --fail --silent --location "${proto[@]}" --connect-timeout 5 --max-time 10 \
         -o "$tmp/SHASUMS256.txt" "$dist/SHASUMS256.txt" 2>/dev/null; then
       echo "session-start: could not download SHASUMS256.txt for Node $ver (no network?), so Node was not installed; $manual."
       exit 0
@@ -137,12 +151,16 @@ node_setup() (
       echo "session-start: not enough time left in the session-start hook to download Node $ver; $manual."
       exit 0
     fi
-    if ! curl --fail --silent --show-error --location --connect-timeout 5 --max-time "$left" \
+    if ! curl --fail --silent --location "${proto[@]}" --connect-timeout 5 --max-time "$left" \
         -o "$tmp/$file" "$dist/$file" 2>/dev/null; then
       echo "session-start: could not download Node $ver within ${left}s (no network or too slow), so Node was not installed; $manual."
       exit 0
     fi
 
+    # This proves the download is intact and matches SHASUMS256.txt; it does
+    # not prove it is genuine, since both come from the same place over HTTPS.
+    # Checking the GPG signature in SHASUMS256.txt.asc against the Node release
+    # keys is a possible later improvement.
     got="$(sha256sum "$tmp/$file" | awk '{ print $1 }')"
     if [ "$got" != "$want" ]; then
       echo "session-start: the Node $ver download failed its SHA-256 check and was deleted, so Node was not installed; $manual, after checking it against SHASUMS256.txt."
@@ -160,9 +178,12 @@ node_setup() (
       exit 0
     fi
 
-    # Replace a broken cache entry, then move the checked build in with one
-    # rename. If another session got there first, use its copy.
-    [ -e "$cache" ] && rm -rf "$cache"
+    # Move a broken cache entry aside (the trap deletes it), then move the
+    # checked build in with one rename. Check again first: if another session
+    # has just installed a good copy, keep it and use it.
+    if [ -e "$cache" ] && [ "$("$cache/bin/node" -v 2>/dev/null)" != "v$ver" ]; then
+      mv -T "$cache" "$tmp/old" 2>/dev/null
+    fi
     if ! mv -T "$unpacked" "$cache" 2>/dev/null \
         && [ "$("$cache/bin/node" -v 2>/dev/null)" != "v$ver" ]; then
       echo "session-start: could not move Node $ver into $cache, so Node was not installed; $manual."
@@ -170,13 +191,20 @@ node_setup() (
     fi
   fi
 
-  line="export PATH=\"$cache/bin:\$PATH\""
+  # %q quotes the folder, so an unusual HOME cannot break or add to the line.
+  # "$PATH" stays literal and is expanded when the file is sourced.
+  printf -v line 'export PATH=%q:"$PATH"' "$cache/bin"
   if [ -z "${CLAUDE_ENV_FILE:-}" ]; then
     echo "session-start: Node $ver is in $cache ($state), but CLAUDE_ENV_FILE is not set, so it is not on PATH; run: $line"
     exit 0
   fi
   if ! grep -qxF "$line" "$CLAUDE_ENV_FILE" 2>/dev/null; then
-    if ! printf '%s\n' "$line" >> "$CLAUDE_ENV_FILE" 2>/dev/null; then
+    # Start on a new line if the file does not end with one.
+    nl=""
+    if [ -s "$CLAUDE_ENV_FILE" ] && [ -n "$(tail -c 1 "$CLAUDE_ENV_FILE" 2>/dev/null)" ]; then
+      nl=$'\n'
+    fi
+    if ! { printf '%s%s\n' "$nl" "$line" >> "$CLAUDE_ENV_FILE"; } 2>/dev/null; then
       echo "session-start: Node $ver is in $cache ($state), but $CLAUDE_ENV_FILE could not be written, so it is not on PATH; run: $line"
       exit 0
     fi
