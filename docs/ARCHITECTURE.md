@@ -1,8 +1,8 @@
 # FeenGo architecture
 
-**Status: draft for owner approval.** Written 2026-11-18 by the architect for slices S0 (Foundation) and S1 (Sign-in). Approving this document approves the decisions, the pinned versions and the exact dependency lists in sections 17 and 18. Anything outside those lists needs a new approval.
+**Status: draft for owner approval.** Written 2026-11-18 by the architect for slices S0 (Foundation) and S1 (Sign-in). Approving this document approves everything in it, including the pinned versions and the exact dependency lists in sections 17 and 18, **except the open questions in section 22**, which the owner decides one by one. Where a design depends on an open question, the text says so and names the default that applies until the answer comes. Anything outside the dependency lists needs a new approval.
 
-Read with `docs/STACK.md` (the stack and the rules), `docs/PRD.md` (requirement IDs), `docs/ROADMAP.md` (slices) and `docs/api/openapi.yaml` (the contract). Decisions are also logged in `docs/DECISIONS.md`.
+Read with `docs/STACK.md` (the stack and the rules), `docs/PRD.md` (requirement IDs), `docs/ROADMAP.md` (slices) and `docs/api/openapi.yaml` (the contract). `docs/DECISIONS.md` holds only decisions the owner has made. The architect's proposals are in section 24; each one moves to `docs/DECISIONS.md` once the owner approves it.
 
 ## Contents
 
@@ -29,6 +29,7 @@ Read with `docs/STACK.md` (the stack and the rules), `docs/PRD.md` (requirement 
 21. CI plan
 22. Questions for the owner
 23. Traceability
+24. Proposed decisions, awaiting the owner
 
 ---
 
@@ -64,17 +65,19 @@ Read with `docs/STACK.md` (the stack and the rules), `docs/PRD.md` (requirement 
 
 ```
 FeenGo/
-  package.json              root workspace: scripts and shared dev tools only (release-manager)
-  pnpm-workspace.yaml       apps/api, apps/partner-web, apps/admin-web, packages/*  (release-manager)
-  pnpm-lock.yaml
-  .npmrc                    engine-strict, save-exact                               (release-manager)
-  .nvmrc                    26.13.1                                                 (release-manager)
-  tsconfig.base.json        strict TypeScript settings shared by all TS apps        (release-manager)
-  eslint.config.mjs         shared ESLint flat config                               (release-manager)
-  .prettierrc               formatting                                              (release-manager)
-  docker-compose.yml        local Postgres and Redis (C1)                           (release-manager)
-  .env.example              every variable, no values that work anywhere real       (release-manager)
-  .github/workflows/        CI                                                      (release-manager)
+  package.json              root workspace: scripts and shared dev tools only (release-manager, C1)
+  pnpm-workspace.yaml       apps/api, apps/partner-web, apps/admin-web, packages/*,
+                            tests/contract, tests/e2e/web                          (release-manager, C1)
+  pnpm-lock.yaml            one lockfile                                            (release-manager, C1)
+  .npmrc                    engine-strict, save-exact                               (release-manager, C1)
+  .nvmrc                    26.13.1                                                 (release-manager, C1)
+  tsconfig.base.json        strict TypeScript settings shared by all TS apps        (release-manager, C1)
+  eslint.config.mjs         shared ESLint flat config                               (release-manager, C1)
+  .prettierrc               formatting                                              (release-manager, C1)
+  docker-compose.yml        local Postgres and Redis                                (release-manager, C1)
+  .env.example              every variable, no values that work anywhere real       (release-manager, C1)
+  redocly.yaml              contract lint rules (section 21)                        (release-manager, C3)
+  .github/workflows/        CI, every job                                           (release-manager)
   apps/
     api/                    NestJS                                                  (backend-dev)
     mobile/                 Flutter, not part of the pnpm workspace                 (mobile-dev)
@@ -84,6 +87,10 @@ FeenGo/
     design-tokens/          token source, generator, generated CSS, TS and Dart     (ui-ux-designer)
       flutter/              generated Dart package `feengo_design_tokens`
     web-ui/                 shared React components, created only when needed       (web-dev)
+  tests/                                                                            (qa-tester)
+    contract/               API contract tests, its own workspace package
+    e2e/web/                Playwright journeys for both websites, its own workspace package
+    e2e/mobile/             Maestro flows for the app
   docs/                     documents; docs/api is the contract                     (architect and others)
   store/                    store listing material                                  (release-manager)
 ```
@@ -94,35 +101,49 @@ FeenGo/
 
 **Shared web component library.** `packages/web-ui` is owned by web-dev and is created only when both websites need the same component, which is likely in S2 when the partner dashboard is built. Until then each website keeps its own components. Generated API types for the websites follow the same rule: inside `apps/admin-web` in S1, moved to a shared `packages/api-types` package once the partner dashboard also calls the API.
 
-**Root tooling is owned by release-manager:** the root `package.json`, workspace file, lockfile policy, shared TypeScript, ESLint and Prettier configs, Compose files, `.env.example` and CI. App owners change their own `package.json` only.
+**Root tooling is owned by release-manager.** C1 creates every root file: `package.json` with the root dev dependencies (section 18.1), `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `tsconfig.base.json`, `eslint.config.mjs`, `.prettierrc`, `.npmrc`, `.nvmrc`, `docker-compose.yml`, the database init script and `.env.example`. Later changes to root files are release-manager's too. App owners change only their own folder, including their own `package.json`.
+
+**Every CI job is written by release-manager.** For each increment, section 3 names whether the job arrives in the same pull request (release-manager adds it as a second owner, touching only `.github/`) or in a follow-up pull request.
+
+**One lockfile change at a time.** Only one open pull request may touch `pnpm-lock.yaml` at a time. The strictly sequential increments in section 3 already give this; it also applies to dependency-update pull requests, which wait while a feature pull request changes the lockfile.
+
+**qa-tester's files live in `tests/`**, so qa-tester never edits another owner's folder. `tests/contract` and `tests/e2e/web` are workspace packages with their own dependencies (section 18.6). Maestro flows in `tests/e2e/mobile` find widgets by keys that mobile-dev adds; the list of keys is agreed in writing in the screen spec before the flow is written. Unit, widget and golden tests stay in each app and belong to that app's owner.
 
 **Rules for dependencies.** Exact versions (`save-exact`), one lockfile, `engine-strict` on Node. A dependency not listed in section 18 needs the owner's approval first (CLAUDE.md).
 
 ## 3. S0 increments C1 to C11
 
-Each increment is one pull request that builds, tests and can be merged alone. Each one adds its own CI job when it lands, so the pipeline grows with the code.
+Each increment is one pull request that builds, tests and can be merged alone. **The increments are built strictly in this order: each one is merged before the next one starts** (ROADMAP.md). Only design specs and documents for the next slice may be prepared alongside.
 
-| Inc. | Pull request | Owner | Needs | What proves it |
+| Inc. | Pull request | Owner | CI job, written by release-manager | What proves it |
 | --- | --- | --- | --- | --- |
-| C1 | Local services: `docker-compose.yml` with Postgres 18.7 and Redis 8.10.3, an init script that creates the two database roles (section 5), `.env.example` | release-manager | nothing | `docker compose up -d` gives healthy Postgres and Redis |
-| C2 | API health: NestJS app, config validation, structured logging, database and Redis clients, `GET /health`, `GET /health/ready` | backend-dev | C1 for readiness | API tests for both endpoints, including 503 when Redis is stopped |
-| C3 | CI for the API: workflow skeleton, install, lint, type check, unit and API tests with Postgres and Redis service containers, Docker build, contract lint, dependency scan | release-manager | C2 | Pipeline green on a push |
-| C4 | Migration tool and settings tables: Kysely migrator, first migration creating `setting_definitions` and `settings`, migrate up, down, up in CI, type generation | backend-dev | C1, C2 | Migrations run forward and back on an empty database |
-| C5 | Design tokens package: DTCG token files with the provisional tokens, Style Dictionary build to CSS, TypeScript and Dart, contrast check, committed outputs | ui-ux-designer | nothing | Build is reproducible; CI fails if outputs are stale |
-| C6 | Flutter app shell: flavors, light and dark themes from tokens, English and Arabic with right to left, language and theme switch remembered, placeholder home screen | mobile-dev | C5 | Widget and golden tests in both languages and themes |
-| C7 | Analytics test event: Firebase projects wired per flavor, one test event | mobile-dev | C6, and the owner creating Firebase projects | Event seen in Firebase DebugView |
-| C8 | Partner-web shell: Next.js app, tokens, English and Arabic with `lang` and `dir`, placeholder page | web-dev | C5 | Unit test and Playwright screenshot in both languages |
-| C9 | Admin-web shell: the same for the back office | web-dev | C5 | As C8 |
-| C10 | iOS build in CI: unsigned `flutter build ios` on macOS for pull requests to main | release-manager | C6 | Job green on a pull request |
-| C11 | Test suites: Maestro smoke flow for the app, Playwright smoke for both websites, API contract tests, all wired into CI | qa-tester | C2 to C10 | Full run green; S0 done-check in ROADMAP.md |
+| C1 | Root workspace files (section 2) and local services: `docker-compose.yml` with Postgres 18.7 and Redis 8.10.3, an init script that creates the two database roles (section 5), `.env.example` | release-manager | None yet; C3 starts the pipeline | `pnpm install` works on a clean checkout; `docker compose up -d` gives healthy Postgres and Redis |
+| C2 | API health: NestJS app, config validation, structured logging with redaction, database and Redis clients, `GET /health`, `GET /health/ready` | backend-dev | Follow-up pull request: C3 | API tests for both endpoints, including 503 when Redis is stopped; the log-redaction test (section 4.5) |
+| C3 | CI for the API: workflow skeleton, install, lint, type check, unit and API tests with Postgres and Redis service containers, Docker build, contract lint with `redocly.yaml`, dependency scan | release-manager | This is the job | Pipeline green on a push |
+| C4 | Migration tool and settings tables: Kysely migrator, first migration creating `setting_definitions` and `settings`, migrate up, down, up in CI, type generation | backend-dev | Same pull request: migration and generated-types steps added to the api job | Migrations run forward and back on an empty database |
+| C5 | Design tokens package: DTCG token files with the provisional tokens, temporary dark-theme values that pass contrast (section 13), Style Dictionary build to CSS, TypeScript and Dart, contrast check, committed outputs | ui-ux-designer | Same pull request: design-tokens job | Build is reproducible; contrast check passes; CI fails if outputs are stale |
+| C6 | Flutter app shell: flavors, light and dark themes from tokens following the phone's setting, English and Arabic with right to left, a language switch that is remembered, placeholder home screen | mobile-dev | Same pull request: mobile job, which uploads the Android debug APK as a build artifact | Widget and golden tests in both languages and themes |
+| C7 | Analytics test event: Firebase projects wired per flavor, one test event | mobile-dev | No new job; the mobile job runs its tests | A unit test with a mocked analytics service proves the event is sent once with its parameters; the event is seen in Firebase DebugView from both phones |
+| C8 | Partner-web shell: Next.js app, tokens, English and Arabic with `lang` and `dir`, placeholder page | web-dev | Same pull request: partner-web job | Unit test and Playwright screenshot in both languages; ESLint runs cleanly with the pinned versions |
+| C9 | Admin-web shell: the same for the back office | web-dev | Same pull request: admin-web job | As C8 |
+| C10 | iOS build in CI: unsigned `flutter build ios` on macOS | release-manager | This is the job. Its trigger waits for the owner's answer to question 16 (section 22) | Job green |
+| C11 | Test suites: Maestro smoke flow, Playwright smoke for both websites, API contract tests, all in `tests/` | qa-tester | Same pull request: end-to-end and contract jobs | Full run green; S0 done-check in ROADMAP.md |
 
-C5 can be built in parallel with C1 to C4. C8 and C9 can follow C5 in either order. Nothing in an earlier increment depends on a later one.
+Nothing in an earlier increment depends on a later one.
+
+### 3.1 How S0 is checked on real phones
+
+ROADMAP.md's done-check needs the empty app running on a real iPhone and a real Android phone in both languages. In S0 this is done without any store:
+
+- **iPhone:** installed from Xcode on the owner's Mac, signed with the owner's Apple team (`flutter run --flavor dev` with the phone connected). A free personal team works but its builds stop opening after 7 days; the paid Apple Developer Program account needed later for TestFlight works without that limit.
+- **Android:** the mobile CI job uploads the debug APK of the `dev` flavor as a build artifact; the owner downloads it and installs it on the phone.
+- **TestFlight and Google Play internal testing are not part of S0.** They start with the first tester release in S1 (ROADMAP.md, "When a slice is done", step 5).
 
 ## 4. Backend: modules, request pipeline and API conventions
 
 ### 4.1 Framework
 
-NestJS 12 on Express 5 (the NestJS default), as ES modules, TypeScript 6.0 in strict mode. NestJS 12's own project template uses ES modules and Vitest, and this design follows that template rather than fighting it (section 17).
+NestJS 12 on Express 5 (the NestJS default), as ES modules, TypeScript 6.0 in strict mode. NestJS 12's own project template uses ES modules and Vitest, and this design follows that template rather than fighting it (section 17). Using Vitest instead of the Jest named in STACK.md is question 4 in section 22; section 18.7 has the Jest list if the owner refuses.
 
 ### 4.2 Modules and table ownership
 
@@ -142,7 +163,9 @@ Each module owns its tables. Another module may use them only through the owning
 | notifications | none in S1 (message log from S4) | `OtpSender.send(...)` with WhatsApp, SMS and fake providers | S1 |
 | venues, availability, bookings, events, payments | later slices | | S2 to S6 |
 
-`customers` is one more module than the list in STACK.md. It keeps profile data apart from sign-in mechanics, so the auth module never touches personal fields directly.
+`customers` is one more module than the list in STACK.md (question 17 in section 22). It keeps profile data apart from sign-in mechanics, so the auth module never touches personal fields directly.
+
+**Transactions across modules.** When one action changes tables of several modules (account deletion, section 10), the module that owns the action opens a Kysely transaction and passes the transaction handle to the other modules' public service methods, which accept an optional `trx` argument. No module reaches into another's tables, and the action still commits or fails as one.
 
 ### 4.3 Request pipeline
 
@@ -150,13 +173,13 @@ In order, for every request:
 
 1. **Helmet** security headers. No CORS: the app is not a browser, and the websites call the API from their servers, so the API refuses cross-origin browser calls by default.
 2. **Request ID** from `X-Request-Id` (if a valid UUID) or a new one, returned on the response and attached to every log line.
-3. **Structured logging** with pino. Redacted paths: `authorization`, `cookie`, any `password`, `code`, `refreshToken`, `mfaToken`, `phone`, `email`. Phone numbers appear in logs only as the last 3 digits.
+3. **Structured logging** with pino, by the rules in section 4.5.
 4. **Body size limit** of 64 KB (file uploads in S2 go straight to object storage, not through JSON bodies).
-5. **Rate limit guard** (Redis, section 7.4).
+5. **Rate limit guard** (Redis, section 7.4), using the client IP described in section 4.6.
 6. **Authentication guard.** Every route needs a valid access token unless it is marked `@Public()`. Secure by default.
 7. **Role guard.** Each route declares its roles, matching `x-roles` in the contract. Admin routes also require `amr` to contain `otp`.
 8. **Ownership.** Services take the caller's ID from the token, never from the request body. `/v1/me` has no ID in the path, so there is nothing to tamper with.
-9. **Validation.** A zod schema per request body and query, written to match the contract, with strict objects that reject unknown fields. API tests check every response against `openapi.yaml`.
+9. **Validation.** A zod schema per request body and query, written to match the contract, with strict objects that reject unknown body fields and unknown query parameters (`400 VALIDATION_FAILED`, field code `UNKNOWN_FIELD`). API tests check every response against `openapi.yaml`.
 10. **Exception filter** turns every error into the `Problem` shape.
 
 ### 4.4 API conventions (all in `openapi.yaml`)
@@ -168,6 +191,22 @@ In order, for every request:
 - **Money** (from S4): integer minor units (piastres) plus an ISO 4217 currency code. Never floating point.
 - **Bilingual text** (from S2): sent as `{ "en": "...", "ar": "..." }` objects so clients switch language without fetching again.
 - **Idempotency** (from S4): booking and payment `POST`s require an `Idempotency-Key` header (UUID). The API stores the key with a hash of the request and the response for 24 hours, scoped to the caller. The same key with the same body returns the stored response; with a different body, `409 IDEMPOTENCY_KEY_REUSED`. Table `idempotency_keys` is created in S4.
+- **Unexpected errors** use the same shape: every operation has a `default` response of `INTERNAL_ERROR` (500) or `SERVICE_UNAVAILABLE` (503). The one exception is `GET /health/ready`, whose 503 returns the `Readiness` body so probes can see which dependency is down.
+
+### 4.5 Logging and redaction
+
+- **Bodies are never logged**, neither requests nor responses. A request log line holds the method, the route pattern (not the raw URL), the status, the duration, the request ID and the caller's subject ID.
+- **Redaction** applies to anything else that reaches a log, with pino's redaction paths, including one-level wildcards: `req.headers.authorization`, `req.headers.cookie`, `req.headers["x-feengo-forwarding-key"]`, `res.headers["set-cookie"]`, `*.password`, `*.code`, `*.accessToken`, `*.refreshToken`, `*.tokens`, `*.mfaToken`, `*.otpauth`, `*.secret`, `*.name`, `*.email`, `*.phone`, `*.to`, `*.phone_e164` and the top-level keys of the same names, such as `phone_e164`. Where a phone must be identified for support, the log carries only its last 3 digits.
+- **Outbound calls to providers are never logged** (WhatsApp, SMS, and later Paymob and Firebase). Their HTTP clients have request and response logging switched off; the code logs only the provider name, the outcome, the provider's message ID and the duration.
+- **The websites follow the same rules.** Their server code logs through one small wrapper that accepts only named, allowed fields; it never logs bodies, cookies or tokens.
+- **Test, written in C2 and extended in S1:** `Q-05 logs never contain a known code, token or phone number`. It captures every log line during a request-code, verify, refresh and profile run with a fixed fake code, and fails if the code, either token or the phone number appears. S1 adds the same test for the admin website's sign-in route handlers.
+
+### 4.6 Client IP and the website servers
+
+- Behind the host's load balancer, the API takes the client IP from `X-Forwarded-For`, trusting only the number of proxy hops set in `TRUST_PROXY`.
+- Calls from the website servers would otherwise all come from one IP. Each website server therefore sends the browser's IP in `X-FeenGo-Client-IP` together with `X-FeenGo-Forwarding-Key`, a secret shared only with the API (`BFF_FORWARDING_KEYS`, one key per website). The API uses `X-FeenGo-Client-IP` only when the key matches (compared in constant time) and ignores it otherwise.
+- **Per-IP limits are high ceilings against abuse, not everyday limits.** Many Egyptian mobile customers share one carrier IP address, so the everyday limits are per phone, per device, per email or per session (sections 7 and 8), and the per-IP numbers in the contract are set well above what a busy carrier address sends.
+- Health probes are not limited per IP in practice: their ceilings in the contract are far above what probes send, and readiness results are cached for 1 second so a flood never reaches the database.
 
 ## 5. Database: access layer, migrations and data model
 
@@ -193,6 +232,7 @@ Alternatives considered:
 - CI runs up, then down to zero, then up again on an empty database, then regenerates types and fails if `schema.generated.ts` changed.
 - Expand then contract: a column is added and filled in one release, and old columns are removed in a later one, so a deploy never breaks running containers.
 - In deployed environments, migrations run as a one-off release step before new containers start, using the migrator role.
+- **Down migrations are blocked outside development.** The migration command refuses `down` unless `APP_ENV` is `local` or `test`, and the deploy pipeline only ever runs `latest`. A production rollback is a new forward migration.
 
 **Database roles**, created once per environment:
 
@@ -240,12 +280,25 @@ The first migration creates the settings tables only. Their design is in section
 | `totp_last_used_step` | bigint, null | rejects reuse of an accepted code |
 | `role` | text | not null, default `'admin'`, `CHECK (role IN ('admin'))`, widened by migration if roles are added |
 | `status` | text | not null, default `'active'`, `CHECK (status IN ('active','disabled'))` |
-| `failed_attempts` | smallint | not null, default 0, `CHECK (failed_attempts >= 0)` |
-| `locked_until` | timestamptz, null | |
 | `last_signed_in_at` | timestamptz, null | |
 | `created_at`, `updated_at` | timestamptz | not null |
 
-No API creates admins. Rows are created only by the seed command (section 9).
+No API creates admins. Rows are created only by the seed command (section 9). The sign-in lock is not kept here; it lives only in `admin_sign_in_attempts`.
+
+#### `admin_sign_in_attempts` (module: admin)
+
+The one place where admin sign-in failures and locks are kept, for known and unknown email addresses alike.
+
+| Column | Type | Rules |
+| --- | --- | --- |
+| `email_hmac` | bytea | primary key; HMAC-SHA-256 of the lower-case email with `PHONE_HASH_PEPPER`, so unknown addresses are not stored in plain text |
+| `failed_attempts` | smallint | not null, `CHECK (failed_attempts >= 0)` |
+| `window_started_at` | timestamptz | not null |
+| `locked_until` | timestamptz, null | |
+| `updated_at` | timestamptz | not null |
+
+- Updated atomically in one statement: `INSERT ... ON CONFLICT (email_hmac) DO UPDATE SET failed_attempts = CASE WHEN window_started_at < now() - lock window THEN 1 ELSE failed_attempts + 1 END, ... RETURNING failed_attempts, locked_until`. Two wrong passwords at the same moment both count.
+- A successful sign-in deletes the row. Rows whose window and lock have passed are removed by the daily purge.
 
 #### `otp_challenges` (module: auth)
 
@@ -258,16 +311,16 @@ No API creates admins. Rows are created only by the seed command (section 9).
 | `channel` | text | not null, `CHECK (channel IN ('whatsapp','sms'))`, the channel finally used |
 | `fallback_used` | boolean | not null, default false |
 | `provider` | text | not null, for example `fake`, `whatsapp-cloud` |
-| `provider_message_id` | text, null | for delivery receipts |
+| `provider_message_id` | text, null | the provider's ID, for support and, once a vendor is chosen, delivery receipts |
 | `delivery_status` | text | not null, `CHECK (delivery_status IN ('queued','sent','delivered','failed'))` |
 | `language` | text | not null, `CHECK (language IN ('en','ar'))` |
-| `wrong_attempts` | smallint | not null, default 0 |
+| `wrong_attempts` | smallint | not null, default 0, `CHECK (wrong_attempts >= 0)`; a per-challenge cap that still holds if Redis loses data (section 7.5) |
 | `expires_at` | timestamptz | not null; `created_at` plus the `auth.otp.code_ttl_seconds` setting at creation |
 | `consumed_at` | timestamptz, null | set on success, or when a newer code replaces it, or on lock |
 | `created_at` | timestamptz | not null |
 
 - Index `(phone_e164, created_at DESC)` to find and end the previous challenge.
-- Unique partial index on `(provider, provider_message_id) WHERE provider_message_id IS NOT NULL` for delivery receipts.
+- Unique partial index on `(provider, provider_message_id) WHERE provider_message_id IS NOT NULL`.
 - Index on `created_at` for the purge.
 - Retention: rows older than 24 hours are deleted by a daily purge command (`pnpm --filter @feengo/api run job:purge`), run by the host's scheduler. They exist only to verify codes and to debug delivery.
 
@@ -309,7 +362,7 @@ No API creates admins. Rows are created only by the seed command (section 9).
 
 - `CHECK ((subject_type = 'customer' AND customer_id IS NOT NULL AND admin_user_id IS NULL) OR (subject_type = 'admin' AND admin_user_id IS NOT NULL AND customer_id IS NULL AND device_id IS NULL))`. S2 adds `partner_user_id` and widens this check in the same migration.
 - Indexes: `(session_id)`, `(customer_id) WHERE revoked_at IS NULL`, `(admin_user_id) WHERE revoked_at IS NULL`, `(expires_at)` for the purge.
-- Expired or revoked rows are purged after 30 days by the same daily command.
+- Purge, by the same daily command: a **used** token is kept only for the reuse-detection window (`REFRESH_REUSE_DETECTION_DAYS`, default 7) and then deleted; replaying a token older than that gets `REFRESH_TOKEN_INVALID` without ending the session. Expired and revoked tokens are deleted after 30 days.
 
 #### `admin_activity_log` (module: admin)
 
@@ -328,15 +381,16 @@ No API creates admins. Rows are created only by the seed command (section 9).
 | `ip_address` | inet, null | of the admin, for security review |
 
 - Indexes: `(occurred_at DESC)`, `(actor_admin_id, occurred_at DESC)`, `(target_type, target_id, occurred_at DESC)`, `(action, occurred_at DESC)`.
-- Append-only, enforced by the database and not only by code: `feengo_app` has only `SELECT, INSERT`; a `BEFORE UPDATE OR DELETE OR TRUNCATE` trigger raises an error for every role, including the table owner. The migration's `down` is the only way to drop it, and that runs only on development databases.
+- Append-only, enforced by the database and not only by code: `feengo_app` has only `SELECT, INSERT`, and a `BEFORE UPDATE OR DELETE OR TRUNCATE ... FOR EACH STATEMENT` trigger raises an error (statement level, because `TRUNCATE` triggers can only be statement level). This stops the API, any bug in it and any mistake by an operator using the app role.
+- **What it does not stop:** the table owner (`feengo_migrator`) or a database superuser can drop or disable the trigger. That is why the migrator credentials are kept separately from the app's, down migrations are refused outside development (section 5.1), and the deploy pipeline runs only forward migrations. Making tampering by those roles detectable needs a hash chain or an off-site copy of the log, a possible later step (section 9.3).
 - Written in the same transaction as the action it records, so an action cannot happen without its entry.
 - Kept indefinitely until a lawyer sets a retention period.
 
 ### 5.4 Room for later slices
 
-Not created now. Listed so that S0 and S1 choices do not block them.
+Not created now. Listed so that S0 and S1 choices do not block them. **Everything in this table is provisional:** each slice's architecture update confirms or changes it, with the owner's approval.
 
-| Table (slice) | Key points already decided |
+| Table (slice) | Provisional key points |
 | --- | --- |
 | `venues` (S2) | `latitude double precision NOT NULL CHECK (latitude BETWEEN -90 AND 90)`, `longitude ... BETWEEN -180 AND 180`, `city_code`, `country_code` (ISO 3166-1, `'EG'`), `currency_code` (ISO 4217, `'EGP'`), `time_zone` (`'Africa/Cairo'`), `name_en` and `name_ar` both not null, `status` (pending, approved, rejected, suspended). Venue-scope rows in `settings` get their foreign key to `venues` in this migration. |
 | `partner_users`, `venue_members` (S2) | owners and staff; `refresh_tokens.partner_user_id` added |
@@ -344,6 +398,7 @@ Not created now. Listed so that S0 and S1 choices do not block them.
 | `agreement_versions`, `agreement_acceptances` (S2) | accepted version and time (P-01, A-09) |
 | `categories`, `occasions`, `cuisines`, `areas` (S2) | admin lists in both languages (A-05) |
 | `setting_changes` (S4) | the R-04 log: who, key, scope, old value, new value, when; append-only like the activity log |
+| `booking_categories` (S4) | the admin-editable list of booking categories (normal table, birthday, engagement, wedding), names in both languages; gives `settings.booking_category_id` its foreign key |
 | `bookings` (S4) | `policy_snapshot jsonb NOT NULL` (R-03), city, country and currency copied from the venue, status with a `CHECK`, `idempotency_keys` table, slot locking with a Redis hold plus a row lock on the slot inside the booking transaction (C-10) |
 | `event_requests`, `quotes` (S5) | the request-for-quote flow |
 | `payments`, `refunds`, `payment_events` (S6) | Paymob references only, never card data; each webhook verified and stored before it is trusted |
@@ -354,7 +409,7 @@ Not created now. Listed so that S0 and S1 choices do not block them.
 2. `WHERE status = 'approved' AND latitude BETWEEN $1 AND $2 AND longitude BETWEEN $3 AND $4`, served by a B-tree index `(latitude, longitude) WHERE status = 'approved'`.
 3. `ORDER BY` the haversine distance from a small `IMMUTABLE` SQL function created by migration, then `LIMIT`.
 
-Why this rather than the bundled `cube` and `earthdistance` extensions: at launch there are hundreds to a few thousand venues, so the box leaves at most a few hundred rows to sort, which takes milliseconds and meets Q-01 (1 second on the server) by a wide margin. It needs no extension, so every managed PostgreSQL supports it. It also avoids `earthdistance`'s known trouble with expression indexes during dump and restore. S3 adds a test that seeds 10,000 venues and checks the query plan and time. If venues grow past about 50,000, a migration adds an `earthdistance` GiST index or PostGIS from the same two columns (DECISIONS 2026-11-18).
+Why this rather than the bundled `cube` and `earthdistance` extensions: at launch there are hundreds to a few thousand venues, so the box leaves at most a few hundred rows to sort, which takes milliseconds and meets Q-01 (1 second on the server) by a wide margin. It needs no extension, so every managed PostgreSQL supports it. It also avoids `earthdistance`'s known trouble with expression indexes during dump and restore. S3 adds a test that seeds 10,000 venues and checks the query plan and time. If venues grow past about 50,000, a migration adds an `earthdistance` GiST index or PostGIS from the same two columns (owner decision of 2026-11-18, "PostgreSQL without PostGIS").
 
 ## 6. Settings store (R-01)
 
@@ -369,6 +424,7 @@ Why this rather than the bundled `cube` and `earthdistance` extensions: at launc
 | `value_type` | text | not null, `CHECK (value_type IN ('integer','decimal','boolean','string','enum','money','duration','json'))` |
 | `unit` | text, null | `seconds`, `minutes`, `hours`, `days`, `percent`, `count`; money carries its currency in the value |
 | `venue_overridable` | boolean | not null, default false; true means a venue may choose its own value inside the admin limits (R-02) |
+| `per_booking_category` | boolean | not null, default false; true means the setting has one value per booking category, such as the booking window or the deposit |
 | `label_en`, `label_ar` | text | not null, shown in the settings console (A-04) |
 | `description_en`, `description_ar` | text | not null |
 | `created_at` | timestamptz | not null |
@@ -381,6 +437,7 @@ Why this rather than the bundled `cube` and `earthdistance` extensions: at launc
 | `key` | text | not null, foreign key to `setting_definitions` |
 | `scope` | text | not null, `CHECK (scope IN ('platform','venue'))` |
 | `venue_id` | uuid, null | `CHECK ((scope = 'platform') = (venue_id IS NULL))`; foreign key to `venues` added in S2 |
+| `booking_category_id` | uuid, null | the booking category the row is for; null for settings that are not per category. Foreign key to `booking_categories` added in S4 |
 | `value` | jsonb | not null, the JSON value (number, boolean, string, array or object) |
 | `min_value`, `max_value` | jsonb, null | admin limits; platform rows only |
 | `allowed_values` | jsonb, null | for `enum` settings; platform rows only |
@@ -390,20 +447,21 @@ Why this rather than the bundled `cube` and `earthdistance` extensions: at launc
 | `created_at`, `updated_at` | timestamptz | not null |
 
 - `CHECK (scope = 'platform' OR (min_value IS NULL AND max_value IS NULL AND allowed_values IS NULL))`: only admins set limits.
-- Unique partial indexes: `(key) WHERE scope = 'platform'` and `(key, venue_id) WHERE scope = 'venue'`.
+- Unique partial indexes, with `NULLS NOT DISTINCT` (PostgreSQL 15 or later) so that a null category counts as one value: `(key, booking_category_id) WHERE scope = 'platform'` and `(key, venue_id, booking_category_id) WHERE scope = 'venue'`.
 - Index `(venue_id) WHERE scope = 'venue'`.
+- `SettingsService` refuses a row with a category for a definition that is not per category, and a row without one for a definition that is. A check constraint cannot look at the definition table, so a test covers this rule: `R-01 a per-category setting cannot be saved without its category`.
 
 ### 6.2 Reading, limits and caching
 
-- `SettingsService.get(key)` returns the platform value. `get(key, { venueId })` returns the venue's value if one exists, otherwise the platform value.
-- **Limits (R-02).** Writes check the value against its type and against the platform row's `min_value`, `max_value` and `allowed_values` in the same transaction. When an admin narrows a limit in S4, venue values that fall outside it are reported to the admin before saving; the console decides what to do with them (designed in S4).
+- `SettingsService.get(key)` returns the platform value. `get(key, { venueId, bookingCategoryId })` returns the venue's value for that category if one exists, otherwise the platform value for that category. There is no fallback from a category to "no category": a per-category setting always has a platform row for every category.
+- **Limits (R-02), per category.** Each category has its own platform row, with its own default and its own `min_value`, `max_value` and `allowed_values`; for example the engagement deposit can have different limits from the birthday deposit. A venue's value for a category is checked against the platform row for the same category, in the same transaction as the write. When an admin adds a category (S4), the console creates its platform rows for every per-category setting before the category can be used. When an admin narrows a limit, venue values that fall outside it are reported to the admin before saving; the console decides what to do with them (designed in S4).
 - **Cache.** Every API container keeps all platform settings in memory, loaded at start. A write publishes `settings:changed` on Redis, and every container reloads at once. As a safety net, containers also reload every 60 seconds. Venue values are cached in Redis under `settings:venue:{venueId}`, cleared on write. A change in the back office therefore reaches the app within seconds, with no release (R-01's acceptance check).
 - **Versioning.** Each row has a `version`. The settings console (S4) sends the version it read, and a write with an older version gets `409 VERSION_CONFLICT`, so two admins never overwrite each other silently. The full history (R-04) is the `setting_changes` table in S4. Bookings copy the rules they were made under (R-03), so a later change never alters them.
-- **Changes before S4.** There is no console until S4. S1 values change through a server command (`settings:set <key> <value>`) that validates limits and writes an activity log entry with `actor_type = 'system'`.
+- **Changes before S4.** There is no console until S4. S1 values change through a server command (`settings:set <key> <value> --operator <name>`) that validates limits and writes a `setting.changed` activity log entry with `actor_type = 'system'` and the old and new values (section 9.3).
 
-### 6.3 Settings seeded in S1
+### 6.3 Settings seeded in S1 (proposal)
 
-The PRD fixes some of these values but does not list them as changeable. As the owner asked, they are admin settings anyway, so they can be tuned without a release.
+**This is a proposal awaiting the owner (question 18 in section 22).** The PRD fixes the code expiry, the number of tries and the lock time in C-02 but does not list them among the changeable rules. The proposal makes them admin settings with the ranges below, so they can be tuned without a release. Either way the defaults are exactly the PRD's values. If the owner refuses, these keys become configuration values with the same defaults, and the code reading them does not change.
 
 | Key | Default | Admin limits | Source |
 | --- | --- | --- | --- |
@@ -424,13 +482,16 @@ The PRD fixes some of these values but does not list them as changeable. As the 
 
 1. The app sends `POST /v1/auth/otp/request` with the phone, its installation ID and the chosen language.
 2. The API checks the phone format and country, the lock, the cooldown and the rate limits. It ends any open challenge for that phone, makes a 6-digit code with a secure random generator, stores its HMAC, and asks `OtpSender` to send it.
-3. `OtpSender` tries WhatsApp first. If WhatsApp refuses the message, it sends by SMS straight away. If WhatsApp accepts it but later reports it as failed (delivery receipt webhook), the API sends the same code by SMS if the challenge is still open. The customer can also ask for SMS on a resend (`channel: sms`). The response says which channel was used.
-4. The app sends `POST /v1/auth/otp/verify` with the code and its device details. On success: customer created if new, device upserted, session started, tokens returned. On a wrong code: the counter goes up, and at the limit the phone is locked and the challenge ends.
+3. `OtpSender` tries WhatsApp first. **In S1 the fallback is synchronous only:** if WhatsApp refuses the message during the request, `OtpSender` sends the same code by SMS within the same request. The code is still in memory at that moment; it is never kept after the request ends. The response says which channel was used.
+4. If WhatsApp accepted the message but the customer never receives it, the app offers "send by SMS instead" once the resend cooldown has passed. That is a new request with `channel: sms`, which makes a **new** code, replaces the stored hash and ends the earlier challenge.
+5. The app sends `POST /v1/auth/otp/verify` with the code and its device details. On success: customer created if new, device upserted, session started, tokens returned. On a wrong code: the counter goes up, and at the limit the phone is locked and the challenge ends (section 7.5).
+
+**Late fallback, deferred until the vendor is chosen.** A WhatsApp message that is accepted and then fails later is reported only through the vendor's delivery-receipt webhook. Because only the HMAC of the code is stored, the server cannot resend the same code; on a late failure it would issue a **new** code by SMS and replace the hash on the challenge. That needs a webhook endpoint whose signature scheme depends on the vendor, so it is not in the S1 contract. Once the owner chooses a vendor, the architect adds `POST /v1/webhooks/otp-delivery/{provider}` to the contract: no bearer token, the vendor's signature required and checked before anything else, unknown fields rejected, idempotent on the provider's message ID.
 
 ### 7.2 Rules
 
-- **Expiry, tries and lock** come from the settings in section 6.3. The lock is per phone number and covers all of its challenges, so asking for a new code does not reset the count.
-- **Rate limits per phone and per device** (security baseline) come from settings. Because an installation ID is easy to change, there is also a per-IP limit from configuration.
+- **Expiry, tries and lock** come from the settings in section 6.3 (or from configuration with the same defaults, if the owner refuses question 18). The lock is per phone number and covers all of its challenges, so asking for a new code does not reset the count.
+- **Rate limits per phone and per device** (security baseline) come from settings. Because an installation ID is easy to change, there is also a per-IP ceiling from configuration, set high enough for carrier addresses shared by many customers (section 4.6).
 - **No account discovery.** `request` answers the same for new and existing numbers.
 - **Codes never appear** in logs, analytics, error messages or the database.
 - **Comparison** of hashes is constant-time.
@@ -456,14 +517,57 @@ interface OtpChannelProvider {
 
 ### 7.4 Rate limiter
 
-A small `RateLimiter` service in core uses Redis fixed windows (`INCR` with `EXPIRE` in one Lua call) under keys such as `rl:otp:phone:{hmac(phone)}`. Phone numbers in Redis keys are HMACs, not plain. Limits are read from settings at call time. Redis runs with append-only persistence, so locks survive a restart.
+A small `RateLimiter` service in core uses Redis fixed windows: `INCR`, and `EXPIRE` on the first increment, in one Lua script so the two steps cannot be split. Keys look like `rl:otp:phone:{hmac(phone)}`; phone numbers and emails in Redis keys are always HMACs (with `PHONE_HASH_PEPPER`), never plain. Limits are read from settings at call time. Redis runs with append-only persistence (written every second).
+
+### 7.5 Counters, locks and races
+
+Every counter and every "only once" rule is a single atomic operation. Where each one lives:
+
+| Rule | Where | Atomic operation |
+| --- | --- | --- |
+| Wrong codes per phone (C-02's five tries) | Redis `otp:fail:{hmac(phone)}`, window = `auth.otp.lock_minutes` from the first wrong code | One Lua script, run **before** the code is compared: if `otp:lock:{hmac}` exists, return locked; otherwise `INCR` the counter (setting its expiry on the first increment); if the result is above `auth.otp.max_wrong_attempts`, set the lock and return locked. Only then is the code compared. A correct code deletes the counter. Because the attempt is counted before comparing, parallel guesses can never get more than the allowed number of comparisons. |
+| The lock | Redis `otp:lock:{hmac(phone)}` with expiry `auth.otp.lock_minutes` | Set when a wrong code is the one that reached the limit (that request answers `423 OTP_LOCKED`), and by the script itself for any parallel attempt counted beyond the limit |
+| Wrong codes per challenge | Postgres `otp_challenges.wrong_attempts` | `UPDATE otp_challenges SET wrong_attempts = wrong_attempts + 1 WHERE id = $1 AND wrong_attempts < $max RETURNING wrong_attempts`; no row returned means the challenge is used up. A second cap that does not depend on Redis. |
+| A code works once | Postgres `otp_challenges.consumed_at` | `UPDATE otp_challenges SET consumed_at = now() WHERE id = $1 AND consumed_at IS NULL AND expires_at > now() RETURNING id`, run only after the code matched. No row returned: the API reads the row once more to answer `409 OTP_ALREADY_USED` or `410 OTP_EXPIRED`. |
+| One code at a time per phone | Redis `otp:cooldown:{hmac(phone)}` | `SET ... NX EX <auth.otp.resend_cooldown_seconds>`. Only one of two parallel requests gets through; the other gets `429 OTP_RESEND_TOO_SOON`. In the same database transaction as the insert, the previous open challenge is ended (`UPDATE ... SET consumed_at = now() WHERE phone_e164 = $1 AND consumed_at IS NULL`). |
+| Requests per phone and per device | Redis `rl:otp:phone:...`, `rl:otp:device:...`, one hour | The rate limiter's script (section 7.4) |
+| One customer per phone | Postgres `customers` partial unique index | `INSERT INTO customers (phone_e164, language) VALUES ($1, $2) ON CONFLICT (phone_e164) WHERE phone_e164 IS NOT NULL DO UPDATE SET last_signed_in_at = now() RETURNING id, (xmax = 0) AS inserted`. Two first sign-ins at the same moment give one customer; `inserted` says whether it is new. |
+| One device row per installation | Postgres `devices` unique `(customer_id, installation_id)` | `INSERT ... ON CONFLICT (customer_id, installation_id) DO UPDATE SET last_seen_at = now(), app_version = EXCLUDED.app_version` |
+| Admin sign-in failures | Postgres `admin_sign_in_attempts` | Single-statement upsert (section 5.3) |
+
+**If Redis loses data** (a restart that loses the last second of writes, a failover, or a flush):
+
+- Code expiry and single use still hold, because they are in Postgres.
+- Each challenge still allows at most `auth.otp.max_wrong_attempts` wrong codes, because of the Postgres cap. A guesser therefore gets at most five tries per one-in-a-million code.
+- What is lost: the per-phone lock and counter across challenges, cooldowns and hourly limits. They start again from zero, and the per-challenge cap bounds the damage. Admin locks are not affected, because they are in Postgres.
+- Also lost: the access-token deny-list (an ended session's access token works until it expires, at most 15 minutes; its refresh tokens are already revoked in Postgres), refresh successors cached for the grace period (section 8.1), and admin `mfaToken`s (the admin starts sign-in again).
+- **If Redis cannot be reached at all**, the code request, code check, admin sign-in and refresh endpoints answer `503 SERVICE_UNAVAILABLE`. They never skip their limits.
+
+**Tests for these races**, in the API test suite:
+
+- `C-02 parallel wrong codes never get more than five comparisons per phone`
+- `C-02 the fifth wrong code locks sign-in for the phone`
+- `C-02 two parallel checks of the right code give exactly one session`
+- `C-02 two parallel code requests for one phone send one code`
+- `C-02 a new code ends the previous challenge`
+- `C-02 two parallel first sign-ins for a new phone create one customer`
+- `C-02 a challenge allows at most five wrong codes after Redis is flushed`
+- `C-02 code request and check answer 503 when Redis is down`
 
 ## 8. Sessions and tokens
 
 ### 8.1 Tokens
 
 - **Access token**: JWT signed with EdDSA (Ed25519) using `jose`. Lifetime 15 minutes (`ACCESS_TOKEN_TTL_SECONDS`). Claims: `sub`, `typ` (`customer` or `admin`), `sid`, `auth_time`, `amr`, `iss`, `aud` (`feengo-app` or `feengo-admin`), `iat`, `exp`. The header carries `kid`, so keys rotate without signing anyone out: the newest key signs, and all listed keys verify.
-- **Refresh token**: 256 random bits, base64url, prefixed `frt_` so secret scanners can spot leaks. Only its SHA-256 hash is stored. Single use: every refresh returns a new one and marks the old one used (rotation). Replaying a used token after `REFRESH_REUSE_GRACE_SECONDS` (10) ends the whole session (theft detection). The grace period lets a retried request after a dropped connection succeed.
+- **Refresh token**: 256 random bits, base64url, prefixed `frt_` so secret scanners can spot leaks. Only its SHA-256 hash is stored. Single use: every refresh returns a new one and marks the old one used (rotation). Replaying a used token after `REFRESH_REUSE_GRACE_SECONDS` (10) ends the whole session (theft detection).
+- **Rotation, the grace period, and one branch only.** A session's tokens always form a single chain; a token never gets a second successor.
+  1. Rotation is one statement inside a transaction: `UPDATE refresh_tokens SET used_at = now(), replaced_by_id = $new WHERE token_hash = $1 AND used_at IS NULL AND revoked_at IS NULL AND expires_at > now() RETURNING ...`. The row lock means that of two parallel refreshes with the same token, one rotates and the other waits.
+  2. Before committing, the winner stores the successor in Redis under `rt:succ:{sha256(old token)}` for the grace period, encrypted with AES-256-GCM under a key derived (HKDF) from the **old token itself**, not from its stored hash. Only someone holding the old token can decrypt it; the database and Redis together are not enough.
+  3. A request with an already used token, inside the grace period, gets the **same** successor from that cache, with a newly signed access token. No new refresh token is made.
+  4. Inside the grace period but with the cache missing (Redis lost it), the API answers `401 REFRESH_TOKEN_INVALID` and makes nothing new. The session is not ended, but this client has to sign in again.
+  5. After the grace period, a used token gets `401 REFRESH_TOKEN_REUSED` and the whole session is revoked.
+- **Refresh is rate-limited per session** (30 an hour, `REFRESH_RATE_PER_SESSION_PER_HOUR`), with only a high per-IP ceiling, because admin traffic arrives through the website servers and many customers share carrier addresses.
+- **Tests:** `C-02 a refresh retried within the grace period returns the same successor`, `C-02 two parallel refreshes with one token create one successor`, `C-02 a used refresh token replayed after the grace period ends the session`, `C-02 a refresh replayed within the grace period with the cache lost creates no second branch`, `C-02 refresh is limited per session`.
 - **Revocation before expiry.** Logout, deletion, suspension and admin disabling add the session ID to a Redis deny-list (`sid:revoked:{sid}`) that lives as long as an access token. The guard checks it on every request. This is shared state in Redis, not server memory, so the API stays stateless.
 
 | | Customers (app) | Admins (back office) |
@@ -482,19 +586,37 @@ These are security configuration, not business rules, so they are environment va
 
 ### 8.3 The websites (never readable by page scripts)
 
-- The browser only talks to its own Next.js server. Next.js route handlers call `/v1/admin/auth/...` and `/v1/auth/...`, then set two cookies: `__Host-feengo_at` (access token) and `__Host-feengo_rt` (refresh token), both `HttpOnly; Secure; SameSite=Strict; Path=/`. The `__Host-` prefix stops subdomains from setting or reading them.
-- Server components and server actions read the cookie and call the API with `Authorization: Bearer`. When the access token has expired, the Next.js server refreshes it and resets the cookies.
+The browser only talks to its own Next.js server; only that server calls the API. All cookies below are `HttpOnly; Secure; SameSite=Strict; Path=/` with the `__Host-` prefix, which stops subdomains from setting or reading them. Next.js Server Components cannot set cookies, so every cookie is set either in a route handler or in `proxy.ts` (the Next.js request proxy, formerly middleware).
+
+**Sign-in (admin, A-01)**
+
+1. The sign-in form posts to the route handler `POST /session/password`. It calls `POST /v1/admin/auth/sign-in` and stores the returned `mfaToken` in a short-lived cookie, `__Host-feengo_mfa` (`Max-Age=300`). **No session cookie is set yet.**
+2. The code form posts to `POST /session/totp`. It reads the `mfa` cookie, calls `POST /v1/admin/auth/totp/verify`, deletes the `mfa` cookie, and only then sets `__Host-feengo_at` (access token) and `__Host-feengo_rt` (refresh token).
+3. Sign-out posts to `POST /session/sign-out`, which calls `POST /v1/auth/logout` and deletes both cookies.
+
+**Refresh, one at a time per session**
+
+- `proxy.ts` runs before any page renders. If the access token is missing or expires within 60 seconds and a refresh cookie is present, it calls `POST /v1/auth/refresh`, sets the new cookies on the response, and passes the new access token to the page render through a request header, so the page in that same request already uses it.
+- Within one website server, refreshes are single-flight: parallel requests with the same refresh cookie share one call to the API. Across several website containers, two parallel refreshes are still safe, because the API returns the same successor within the grace period (section 8.1), so the session never splits.
+- If refresh fails, `proxy.ts` deletes the session cookies and sends the browser to the sign-in page.
+
+**Every admin page checks the session itself**
+
+- The proxy is a convenience, not the security boundary. The root layout of the signed-in part of the back office calls `GET /v1/admin/me` with the access token on **every** request, and redirects to the sign-in page if that call does not succeed. The API is the authority: it checks the signature, expiry, deny-list and the second sign-in step. Admin traffic is small, so one extra call per page is cheap.
+- Server actions and route handlers that change data send the access token to the API, which checks it again.
 - CSRF: `SameSite=Strict`, plus a check of the `Origin` header on every state-changing route handler (Next.js server actions already check it).
-- The Next.js request proxy (formerly middleware) sends any request without a session cookie to the sign-in page, so no admin screen renders without a full session (A-01). The API still checks every request itself.
-- The partner dashboard (S2) uses the same pattern with its own cookies and `aud`.
+- **Tests:** `A-01 a forged session cookie never renders an admin page` (a token signed with another key, an altered token and random bytes, each in `__Host-feengo_at`, must lead to the sign-in page with no admin content in the response), `A-01 the password step alone never renders an admin page` (only the `mfa` cookie set), and `A-01 an ended session never renders an admin page`.
+
+The partner dashboard (S2) uses the same pattern with its own cookies and `aud`.
 
 ## 9. Admin sign-in (A-01) and the activity log (A-11)
 
 ### 9.1 Proposal: email, password and authenticator code
 
-1. `POST /v1/admin/auth/sign-in` with email and password. Argon2id check. On success: an opaque `mfaToken`, kept in Redis for 5 minutes, single use, 3 tries.
+1. `POST /v1/admin/auth/sign-in` with email and password. Argon2id check. For an email with no account, the API still runs one Argon2id check against a fixed dummy hash, so the response time does not reveal whether the account exists. On success: an opaque `mfaToken`, kept in Redis for 5 minutes, single use, 3 tries.
 2. `POST /v1/admin/auth/totp/verify` with the `mfaToken` and a 6-digit TOTP code (RFC 6238: SHA-1, 30-second steps, one step of clock drift allowed). A code is accepted once (`totp_last_used_step`). On success: tokens with `amr = ["pwd","otp"]`, and an `admin.signed_in` log entry.
-3. Wrong passwords and wrong codes both count toward `auth.admin.max_wrong_attempts`, per email address, including unknown addresses (counted in Redis), so a lock never reveals whether an account exists. At the limit, an `admin.locked` entry is logged.
+3. Wrong passwords and wrong codes both count toward `auth.admin.max_wrong_attempts`, per email address, including unknown addresses, so a lock never reveals whether an account exists. The count and the lock are kept in one place only, the `admin_sign_in_attempts` table (section 5.3). At the limit, an `admin.locked` entry is logged for a known account.
+4. **Known weakness:** anyone who knows an admin's email can lock that admin out for `auth.admin.lock_minutes` by sending wrong passwords. This is accepted because the lock is short, the per-IP ceiling slows it, and `admin:unlock` (section 9.2) ends it at once. The owner should know it is possible.
 
 - Passwords: at least 12 characters, at most 200. Hashed with Argon2id using the library's current defaults.
 - TOTP secrets: 20 random bytes, encrypted with AES-256-GCM using a key from `TOTP_ENCRYPTION_KEYS` (Node's built-in crypto). The key ID is stored so keys can rotate.
@@ -502,17 +624,22 @@ These are security configuration, not business rules, so they are environment va
 
 ### 9.2 Admin accounts come only from a seed command
 
-There is no sign-up or invite endpoint. Server commands, run inside the API container (`node dist/cli.js ...`), each write an activity log entry with `actor_type = 'system'`:
+There is no sign-up or invite endpoint. Server commands, run inside the API container (`node dist/cli.js ...`), each write an activity log entry with `actor_type = 'system'`. Every command requires `--operator "<name>"`, which is recorded in `details.operator` together with the operating-system user, so A-11's "who" is met for these entries too.
 
-- `admin:create --email --name`: asks for the password without showing it, makes the TOTP secret, and prints the `otpauth://` link and the secret once, for the owner to add to an authenticator app. They are never stored in plain text or logged.
-- `admin:reset-totp --email`: for a lost phone. Ends all of that admin's sessions.
-- `admin:disable --email`: ends all sessions.
+- `admin:create --email --name --operator`: asks for the password without showing it, makes the TOTP secret, and prints the `otpauth://` link and the secret once, for the owner to add to an authenticator app. They are never stored in plain text or logged.
+  - The command **refuses to print the secret unless both its input and output are an interactive terminal**. Run with output redirected or piped, it stops with an error and creates nothing.
+  - It warns before printing that some hosting consoles keep a copy of what they show, and asks for confirmation. Use a console session that is not recorded, or run the command from the owner's machine through a secure tunnel to the environment's database.
+- `admin:reset-totp --email --operator`: for a lost phone. The same terminal rules apply. Ends all of that admin's sessions.
+- `admin:unlock --email --operator`: removes a sign-in lock.
+- `admin:disable --email --operator`: ends all sessions.
 
 ### 9.3 Activity log (A-11)
 
-- `ActivityLog.record()` is the only writer, called in the same transaction as the action. S1 actions: `admin.created`, `admin.signed_in`, `admin.signed_out`, `admin.sign_in_failed` (known email only), `admin.locked`, `admin.totp_reset`, `admin.disabled`. Each later slice adds its own, such as `venue.approved` or `booking.refunded`.
-- `GET /v1/admin/activity-log` reads it, newest first, with filters. Nothing in the API can change or delete an entry, and the database refuses to (section 5.3).
-- Possible later strengthening: a hash chain (each row stores a hash of the previous one) so that even a database superuser's tampering would show. Not needed for S1.
+- `ActivityLog.record()` is the only writer, called in the same transaction as the action. S1 actions: `admin.created`, `admin.signed_in`, `admin.signed_out`, `admin.sign_in_failed` (known email only), `admin.locked`, `admin.unlocked`, `admin.totp_reset`, `admin.disabled`, and `setting.changed`.
+- `setting.changed` records every settings change. In S1 it comes only from `settings:set`; from S4, from the settings console. Its target is `setting` with the key as ID, and `details` holds `key`, `scope`, `venueId`, `bookingCategoryId`, `oldValue`, `newValue`, `oldVersion` and `newVersion`. The R-04 change log in S4 is a separate table, written in the same transaction.
+- Each later slice adds its own actions, such as `venue.approved` or `booking.refunded`.
+- `GET /v1/admin/activity-log` reads it, newest first, with filters. Nothing in the API can change or delete an entry, and the database refuses such changes from the app role (section 5.3).
+- Possible later strengthening: a hash chain (each row stores a hash of the previous one) or a regular off-site copy, so that even tampering by the table owner or a superuser would show. Not needed for S1.
 
 ## 10. Account deletion (C-04)
 
@@ -521,10 +648,15 @@ There is no sign-up or invite endpoint. Server commands, run inside the API cont
 `DELETE /v1/me`, from a screen in the app (Apple and Google both require deletion inside the app, Q-07):
 
 1. The customer must have signed in within the `auth.account_deletion.reauth_window_minutes` setting (default 10). If not, the API returns `REAUTH_REQUIRED` and the app asks for a new phone code first. This stops someone holding an unlocked phone from deleting the account by accident or on purpose.
-2. In one transaction: `phone_e164`, `name` and `email` set to null, `status = 'deleted'`, `deleted_at = now()`. Devices (and push tokens) deleted. All refresh tokens deleted, and session IDs added to the deny-list. OTP challenges for that phone deleted.
-3. From later slices: bookings, event requests, payments and refunds are **kept** with the customer ID and no personal details, because venues need their booking history and the business needs payment records for accounting and tax. Reviews (S7) stay with "Former customer" as the author, or are removed; to be decided in S7.
-4. The app calls Firebase Analytics' `resetAnalyticsData()` and signs out. The API never sends personal data to Firebase, and S1 does not set a Firebase user ID, so there is nothing else to delete there.
-5. The same phone number can then sign up again as a new, empty account.
+2. In one database transaction, opened by the customers module, which passes the transaction handle to the other modules' public services (section 4.2):
+   - customers: `phone_e164`, `name` and `email` set to null, `status = 'deleted'`, `deleted_at = now()`;
+   - auth: every refresh token of the customer **revoked** with reason `account_deleted` (kept so that a replay gets a clean `REFRESH_TOKEN_INVALID`, then removed by the normal 30-day purge); devices and their push tokens deleted; OTP challenges for that phone deleted.
+3. After the commit, every session ID of the customer is added to the Redis deny-list, so access tokens stop working at once. If that write fails, it is retried three times and then logged as an error for the team. The gap is bounded: the refresh tokens are already revoked in Postgres, every `/v1/me` call reads the customer row and refuses a deleted customer with `401`, and any remaining access token expires within 15 minutes.
+4. From later slices: bookings, event requests, payments and refunds are **kept** with the customer ID and no personal details, because venues need their booking history and the business needs payment records for accounting and tax. Reviews (S7) stay with "Former customer" as the author, or are removed; to be decided in S7.
+5. The app calls Firebase Analytics' `resetAnalyticsData()` and signs out. The API never sends personal data to Firebase, and S1 does not set a Firebase user ID, so there is nothing else to delete there.
+6. The same phone number can then sign up again as a new, empty account.
+
+**Suspended customers** (A-03, from S2) cannot sign in, so they cannot delete their account from the app. Apple and Google expect deletion to be possible; how a suspended customer asks for deletion (for example through support) is decided in S2.
 
 Open points for the owner and lawyer (section 22): whether a keyed hash of the phone should be kept so that no-show strikes (C-13) cannot be reset by deleting and signing up again; whether deletion should be blocked while a paid deposit is pending (from S6); and how long anonymised records are kept.
 
@@ -547,14 +679,15 @@ apps/mobile/
                     preferences, analytics, logging (no personal data)
     features/
       home/         S0 placeholder
-      settings/     language and theme switch (S0)
+      settings/     language switch (S0)
       auth/         S1: phone entry, code entry
       profile/      S1: profile, delete account
         data/         API calls and models
         application/  Riverpod providers and state
         presentation/ screens and widgets; no business logic
     l10n/           app_en.arb (template), app_ar.arb
-  test/  integration_test/  maestro/ (C11)
+  test/  integration_test/        unit, widget and golden tests (mobile-dev); Maestro flows
+                                  live in tests/e2e/mobile (qa-tester, section 2)
 ```
 
 ### 11.3 Configuration and flavors
@@ -562,7 +695,8 @@ apps/mobile/
 - Three flavors, `dev`, `staging` and `prod`, each with its own app ID suffix and its own Firebase project, so test data never mixes with real data.
 - Settings per flavor (API base URL, environment name) come from `--dart-define-from-file=config/<flavor>.json`. The app holds no secrets; anything in an app can be extracted.
 - Firebase config files per flavor (`google-services.json`, `GoogleService-Info.plist`) are committed. They identify the project and are not secrets; their API keys are restricted to FeenGo's app IDs in the Google Cloud console.
-- Language and theme choices are kept in `shared_preferences`, so they are remembered before sign-in (C-03). After sign-in the language is also saved to the profile, so the server can send messages in it.
+- The language choice is kept in `shared_preferences`, so it is remembered before sign-in (C-03). After sign-in it is also saved to the profile, so the server can send messages in it.
+- The theme follows the phone's light or dark setting, with no in-app control in S0, as the designer's placeholder spec proposes (`docs/design/s0/placeholder-home.md` on pull request #2). An in-app control later would need only a second preference.
 
 ### 11.4 Standards that the architecture relies on
 
@@ -600,7 +734,11 @@ apps/mobile/
 - **Contrast check.** The build fails if a declared text and background pair in either theme is below WCAG AA (4.5 to 1 for body text, 3 to 1 for large text and interface parts), which protects Q-04 on every token change.
 - **Swapping the design later is a single edit:** the designer changes the token JSON in `packages/design-tokens`, runs the build and commits. No app code changes, because apps refer only to semantic roles. This is why nothing in S0 waits for the final visual identity.
 
-**Finding on the provisional palette** (for ui-ux-designer, not a blocker): primary `#B3204F` on the dark neutral `#1C2430` is 2.41 to 1, and success `#0E6B5E` on dark is 2.44 to 1, both below AA, so the dark theme needs lighter tints for those roles. Accent `#F2A93B` on the light neutral is 1.86 to 1, so it cannot be used for text on light backgrounds. White on primary is 6.49 to 1 and dark neutral on light neutral is 14.52 to 1, both fine.
+**The provisional palette and the contrast gate.** Primary `#B3204F` on the dark neutral `#1C2430` is 2.41 to 1, and success `#0E6B5E` on dark is 2.44 to 1, both below AA. Accent `#F2A93B` on the light neutral is 1.86 to 1. Used as they are, the C5 contrast check would fail, and design must not block the build. So:
+
+- **C5 ships temporary dark-theme values that pass AA.** In the dark theme, the roles that would use primary as text, outline or selected fill map to the light neutral `#FBF6EE` (14.52 to 1 on the dark neutral), with dark neutral on top of selected fills, and accent is used only for the dark focus ring (7.82 to 1). These are exactly the pairs in the designer's S0 placeholder spec (`docs/design/s0/placeholder-home.md`, colour and contrast tables, on pull request #2). Success and accent are not used for text in S0.
+- The light theme uses the provisional colours as they are: primary on the light neutral is 6.03 to 1 and white on primary is 6.49 to 1.
+- The designer replaces the temporary dark values with real tints when the design system is approved: a single edit in `packages/design-tokens`, with the contrast check proving it.
 
 ## 14. Translations
 
@@ -617,7 +755,7 @@ apps/mobile/
 ### 15.1 Analytics
 
 - Firebase Analytics in the app only, one Firebase project per environment. The websites send no analytics in S0 and S1.
-- **S0 test event (C7):** `foundation_test`, sent once when the placeholder home screen first appears, with parameters `language` and `theme`. Checked in Firebase DebugView on a real iPhone and Android phone.
+- **S0 test event (C7):** `foundation_test`, sent once when the placeholder home screen first appears, with parameters `language` and `theme`. Proved by a unit test with a mocked analytics service (the event is sent once, with its parameters), and checked in Firebase DebugView on a real iPhone and Android phone.
 - **Event plan for Q-06**, using Google Analytics' recommended names where they exist:
 
 | Q-06 event | Name | Slice |
@@ -639,7 +777,7 @@ apps/mobile/
 
 Firebase Dynamic Links shut down on 25 August 2025, so it is not an option.
 
-**Proposal: platform links plus the Play Install Referrer, at no extra cost.**
+**Provisional proposal, confirmed in S3's architecture update and by the owner (question 10): platform links plus the Play Install Referrer, at no extra cost.**
 
 - One web address per venue, for example `https://<domain>/v/<venue-slug>`.
 - iOS Universal Links (`apple-app-site-association`) and Android App Links (`assetlinks.json`) open that address in the app when it is installed, handled by `app_links` and go_router.
@@ -669,7 +807,7 @@ Things to know:
 - Flutter 3.50 needs Xcode 15 or later and recommends 16; App Store uploads need Apple's current Xcode. release-manager pins the macOS runner image and Xcode version in C10 and confirms the iOS 15 deployment target still builds with it.
 - Q-02 is marked as a proposal in the PRD; raising the Android minimum later only reduces reach and needs no design change.
 
-**Q-04.** Text follows the phone's text size (no clamping in the app; `rem` units on the websites). Contrast is enforced by the token build (section 13). Golden tests and Playwright screenshots at the largest text size are part of each slice's review.
+**Q-04.** Text follows the phone's text size (no clamping in the app; `rem` units on the websites). Contrast is enforced by the token build (section 13). Golden tests and Playwright screenshots at the largest text size are part of each slice's review. Golden images are made and compared **on Linux CI only**, because font rendering differs between operating systems; the macOS job builds but does not run golden tests.
 
 ## 17. Pinned versions
 
@@ -703,12 +841,12 @@ All checked on **2026-11-18** from the sources the owner named: npm registry met
 | libphonenumber-js | 1.13.16 | 2026-11-10 | The standard phone number library for JavaScript | Validates mobile numbers and their country |
 | nestjs-pino, pino, pino-http | 5.3.2, 10.4.0, 11.0.0 | 2026-11-17, 2026-10-02, 2025-10-04 | The usual fast JSON logger for NestJS | Structured logs with request IDs and redaction |
 | helmet | 8.3.0 | 2026-07-12 | The standard security headers middleware | Security headers |
-| Vitest | 4.1.12 | 2026-10-15 | Very widely used; the 4.x line is still maintained after 5.0 | Matches the NestJS 12 template (`^4.1.2`); 5.x can follow once NestJS moves |
+| Vitest | 4.1.12 | 2026-10-15 | Very widely used; the 4.x line is still maintained after 5.0 | Matches the NestJS 12 template (`^4.1.2`); 5.x can follow once NestJS moves. Depends on question 4; the Jest list is in section 18.7 |
 | Next.js | 16.4.6 | 2026-11-09 | Vercel; 20 releases in 90 days | Current stable major |
 | React | 19.3.1 | 2026-10-14 | Meta | Required by Next.js 16 |
 | next-intl | 4.15.1 | 2026-11-12 | The most used translation library for the App Router; 13 releases in 90 days | Server-side `lang` and `dir`, ICU messages |
 | Playwright | 1.65.1 | 2026-11-13 | Microsoft | Named in STACK.md |
-| ESLint, typescript-eslint, eslint-config-next | 10.15.0, 8.73.0, 16.4.6 | November 2026 | Standard | One linter for all TypeScript apps (NestJS's template now uses oxlint; one tool across the repository is simpler) |
+| ESLint, typescript-eslint, eslint-config-next | 9.39.5, 8.73.0, 16.4.6 | 2026-07-10, 2026-11-16, 2026-11-09 | Standard | One linter for all TypeScript apps (NestJS's template now uses oxlint; one tool across the repository is simpler). **ESLint 9, not 10.15.0:** eslint-config-next 16.4.6 pulls in `eslint-plugin-react` 7.37.5, `eslint-plugin-jsx-a11y` 6.10.2 and `eslint-plugin-import` 2.32.0, whose ESLint peer ranges stop at `^9`. One ESLint version for the whole repository keeps the shared config simple. Move to 10 when those plugins support it. |
 | Style Dictionary | 5.8.0 | 2026-11-03 | The most used token build tool; supports the W3C token format | Section 13 |
 | openapi-typescript, openapi-fetch | 7.13.0, 0.17.0 | both 2026-02-11 | Widely used; slower releases lately; its peer range still says TypeScript 5 | Types from the contract for the websites, S1. web-dev confirms generation under TypeScript 6 in the first S1 pull request; if it fails, types are written by hand and checked by contract tests. |
 | flutter_riverpod | 3.5.0 | 2026-11-06 | 2,919 likes, 4.3 million downloads in 30 days | Section 11.1 |
@@ -717,7 +855,7 @@ All checked on **2026-11-18** from the sources the owner named: npm registry met
 | firebase_crashlytics | 6.1.0 | 2026-11-16 | Google, Flutter Favourite | Crash reports (STACK.md), from the first tester release in S1 |
 | flutter_secure_storage | 11.2.0 | 2026-09-16 | 4,512 likes, 6.2 million downloads in 30 days, 160 of 160 pub points | Keychain and Keystore storage for tokens |
 | dio | 5.11.1 | 2026-09-04 | 8,373 likes, 5.3 million downloads in 30 days | Interceptors for token refresh, timeouts and retries |
-| shared_preferences | 2.5.6 | 2026-10-05 | Flutter team | Language and theme choice |
+| shared_preferences | 2.5.6 | 2026-10-05 | Flutter team | Remembered language choice |
 | package_info_plus | 10.2.2 | 2026-10-01 | Flutter Community, Flutter Favourite | App version for device registration |
 | intl, flutter_localizations | SDK-pinned (0.20.x) | | Dart and Flutter teams | `gen-l10n`; `intl` is declared as `any` so the Flutter SDK chooses the matching version |
 | flutter_lints, mocktail | 6.0.0, 1.0.5 | 2025-05-27, 2026-04-10 | Flutter team; widely used | Lint rules; test doubles |
@@ -730,11 +868,11 @@ The owner's approval of this document approves exactly these lists. Versions are
 
 | Package | Version | Kind | Increment |
 | --- | --- | --- | --- |
-| prettier | 3.10.1 | dev | C3 |
-| @redocly/cli | 2.80.0 | dev | C3 |
-| eslint | 10.15.0 | dev | C3 |
-| typescript-eslint | 8.73.0 | dev | C3 |
-| typescript | 6.0.3 | dev | C3 |
+| prettier | 3.10.1 | dev | C1 |
+| @redocly/cli | 2.80.0 | dev | C1 (used by CI from C3) |
+| eslint | 9.39.5 | dev | C1 |
+| typescript-eslint | 8.73.0 | dev | C1 |
+| typescript | 6.0.3 | dev | C1 |
 
 ### 18.2 `apps/api` (backend-dev)
 
@@ -772,9 +910,9 @@ The owner's approval of this document approves exactly these lists. Versions are
 | @types/supertest | 7.2.1 | dev | C2 |
 | pino-pretty | 13.2.0 | dev | C2 (readable local logs only) |
 | kysely-codegen | 0.20.0 | dev | C4 |
-| ajv | 8.20.0 | dev | C11 (contract tests: responses checked against `openapi.yaml`) |
-| ajv-formats | 3.0.1 | dev | C11 |
-| yaml | 2.9.1 | dev | C11 (reads `openapi.yaml` in tests) |
+| ajv | 8.20.0 | dev | C2 (API tests check each response against `openapi.yaml`) |
+| ajv-formats | 3.0.1 | dev | C2 |
+| yaml | 2.9.1 | dev | C2 (reads `openapi.yaml` in tests) |
 
 ### 18.3 `apps/admin-web` and `apps/partner-web` (web-dev), the same list for each
 
@@ -796,8 +934,9 @@ The owner's approval of this document approves exactly these lists. Versions are
 | @vitejs/plugin-react | 6.3.0 | dev | C8, C9 |
 | jsdom | 31.0.1 | dev | C8, C9 |
 | @testing-library/react | 16.3.3 | dev | C8, C9 |
+| @testing-library/dom | 10.4.2 | dev | C8, C9 (required peer of the two packages around it) |
 | @testing-library/jest-dom | 7.0.1 | dev | C8, C9 |
-| @playwright/test | 1.65.1 | dev | C8, C9 (one smoke test), C11 |
+| @playwright/test | 1.65.1 | dev | C8, C9 (web-dev's own screenshot tests) |
 | openapi-typescript | 7.13.0 | dev | S1 (admin-web), S2 (partner-web) |
 
 ### 18.4 `packages/design-tokens` (ui-ux-designer)
@@ -830,7 +969,35 @@ Assets, not packages: IBM Plex Sans Arabic font files with their Open Font Licen
 
 Expected in later slices, **not** approved now: `app_links` 7.2.2 and `play_install_referrer` 0.6.0 (S3, C-08), `google_maps_flutter` (S3), `firebase_messaging` (S4), BullMQ for background jobs (S4), `json_serializable` if models grow (S3).
 
-### 18.6 CI tools (release-manager, C3 and C10)
+### 18.6 `tests/` packages (qa-tester)
+
+`tests/contract` (contract tests against a running API) and `tests/e2e/web` (journeys across the websites), added in C11:
+
+| Package | Version | Kind | Package |
+| --- | --- | --- | --- |
+| vitest | 4.1.12 | dev | tests/contract |
+| ajv | 8.20.0 | dev | tests/contract |
+| ajv-formats | 3.0.1 | dev | tests/contract |
+| yaml | 2.9.1 | dev | tests/contract |
+| typescript | 6.0.3 | dev | both |
+| @types/node | 26.6.6 | dev | both |
+| @playwright/test | 1.65.1 | dev | tests/e2e/web |
+
+Maestro is a command-line tool installed in CI, not a package; qa-tester pins its version in C11.
+
+### 18.7 Fallback if Vitest is refused (question 4)
+
+If the owner keeps Jest, these replace the Vitest rows; everything else stays the same.
+
+| Where | Remove | Add (exact versions) |
+| --- | --- | --- |
+| `apps/api` | vitest, @vitest/coverage-v8, vite | jest 30.5.2, ts-jest 29.4.15, @types/jest 30.0.0 |
+| each website | vitest, vite, @vitejs/plugin-react, jsdom | jest 30.5.2, jest-environment-jsdom 30.5.2, @types/jest 30.0.0 (Next.js's built-in `next/jest` handles the transform) |
+| `tests/contract` | vitest | jest 30.5.2, ts-jest 29.4.15, @types/jest 30.0.0 |
+
+ts-jest 29.4.15 accepts TypeScript below 7, so it works with TypeScript 6.0.3. NestJS 12 is published as ES modules, so the API's Jest setup must run in Jest's ES module mode (`node --experimental-vm-modules`). That is the friction that made Vitest the proposal; it works, but it is less smooth.
+
+### 18.8 CI tools (release-manager, C3 and C10)
 
 GitHub Actions maintained by GitHub (`actions/checkout`, `actions/setup-node`, `actions/cache`), `pnpm/action-setup`, `subosito/flutter-action` for Flutter, and Google's `osv-scanner` action for the dependency scan of both npm and pub packages. release-manager pins each to a full commit SHA in C3 and lists them in the pull request.
 
@@ -852,13 +1019,13 @@ GitHub Actions maintained by GitHub (`actions/checkout`, `actions/setup-node`, `
 
 - The API reads only environment variables. A zod schema validates them at start-up, and the API refuses to start if one is missing or wrong (for example, the fake code provider outside `local` and `test`).
 - `.env.example` at the root lists every variable with a comment and a harmless placeholder; release-manager keeps it current.
-- API variables: `APP_ENV`, `PORT`, `LOG_LEVEL`, `TRUST_PROXY`, `DATABASE_URL` (app role), `DATABASE_MIGRATOR_URL`, `REDIS_URL`, `JWT_SIGNING_KEYS` (JSON list of Ed25519 keys with IDs), `JWT_ISSUER`, `ACCESS_TOKEN_TTL_SECONDS`, `CUSTOMER_REFRESH_TTL_DAYS`, `CUSTOMER_SESSION_MAX_DAYS`, `ADMIN_REFRESH_IDLE_MINUTES`, `ADMIN_SESSION_MAX_HOURS`, `REFRESH_REUSE_GRACE_SECONDS`, `OTP_CODE_PEPPER`, `PHONE_HASH_PEPPER`, `TOTP_ENCRYPTION_KEYS`, `OTP_WHATSAPP_PROVIDER`, `OTP_SMS_PROVIDER`, provider credentials, `FAKE_OTP_CODE` (local and test only), per-IP rate limits.
-- Website variables: `APP_ENV`, `API_BASE_URL` (server side only; never `NEXT_PUBLIC_`).
+- API variables: `APP_ENV`, `PORT`, `LOG_LEVEL`, `TRUST_PROXY`, `DATABASE_URL` (app role), `DATABASE_MIGRATOR_URL`, `REDIS_URL`, `JWT_SIGNING_KEYS` (JSON list of Ed25519 keys with IDs), `JWT_ISSUER`, `ACCESS_TOKEN_TTL_SECONDS`, `CUSTOMER_REFRESH_TTL_DAYS`, `CUSTOMER_SESSION_MAX_DAYS`, `ADMIN_REFRESH_IDLE_MINUTES`, `ADMIN_SESSION_MAX_HOURS`, `REFRESH_REUSE_GRACE_SECONDS`, `OTP_CODE_PEPPER`, `PHONE_HASH_PEPPER`, `TOTP_ENCRYPTION_KEYS`, `OTP_WHATSAPP_PROVIDER`, `OTP_SMS_PROVIDER`, provider credentials, `FAKE_OTP_CODE` (local and test only), `REFRESH_REUSE_DETECTION_DAYS`, `REFRESH_RATE_PER_SESSION_PER_HOUR`, `BFF_FORWARDING_KEYS` (one key per website server, section 4.6), per-IP ceilings.
+- Website variables: `APP_ENV`, `API_BASE_URL` and `BFF_FORWARDING_KEY` (server side only; never `NEXT_PUBLIC_`).
 - App: per-flavor JSON for `--dart-define-from-file`, no secrets.
 
 ### 19.3 Secrets
 
-- Never in the repository. CI's secret scanning and the `frt_` prefix on refresh tokens help catch mistakes.
+- Never in the repository. GitHub secret scanning with push protection, a repository setting the owner turns on (it is not a CI job), and the `frt_` prefix on refresh tokens help catch mistakes.
 - **CI secrets** (store credentials later, deploy tokens) live in GitHub Environments (`staging`, `production`); production requires the owner's approval to deploy.
 - **Runtime secrets** live in the host's secret store (section 20) and reach containers as environment variables.
 - Rotation: JWT keys and TOTP encryption keys support several keys at once by ID, so they rotate without signing anyone out. Peppers rotate only with a planned migration.
@@ -897,14 +1064,48 @@ None of them stores data in Egypt. Egypt's Personal Data Protection Law (Law 151
 
 ## 21. CI plan
 
-GitHub Actions, owned by release-manager. One workflow with one job per app, run only when that app or what it depends on changed, plus a final summary job that branch protection requires (so skipped jobs never block a merge).
+GitHub Actions, every job written by release-manager. One workflow with one job per app, plus a final summary job that branch protection requires.
+
+**Until the owner answers question 16, CI follows ROADMAP.md literally:** every push to any branch and every pull request runs every Linux job for all four apps, with no path filters. Only the macOS iOS job (C10) depends on the answer, and C10 is not merged before it.
 
 | Trigger | Runner | Jobs |
 | --- | --- | --- |
-| Every push to any branch, and every pull request | Linux | **api**: install, lint, type check, unit tests, API tests against Postgres and Redis service containers, migrations up, down, up, generated-types check, Docker build. **admin-web**, **partner-web**: install, lint, type check, unit tests, `next build`, Playwright smoke. **design-tokens**: build, stale-output check, contrast check. **mobile**: `flutter analyze`, `flutter test` (including golden tests), translation check, debug Android build. **contract**: Redocly lint of `openapi.yaml`. **security**: osv-scanner on all lockfiles, GitHub secret scanning. |
-| Pull requests to `main` only, when `apps/mobile` or `packages/design-tokens` changed | macOS | **ios**: `flutter build ios --no-codesign` for the `staging` flavor |
+| Every push to any branch, and every pull request | Linux | **api**: install, lint, type check, unit tests, API tests against Postgres and Redis service containers, migrations up, down, up, generated-types check, Docker build. **admin-web**, **partner-web**: install, lint, type check, unit tests, `next build`, Playwright smoke. **design-tokens**: build, stale-output check, contrast check. **mobile**: `flutter analyze`, `flutter test` including golden tests (Linux only, section 16), translation check, debug Android build uploaded as an artifact. **contract**: Redocly lint of `openapi.yaml`. **security**: osv-scanner on all lockfiles. **e2e** (from C11): contract tests, Playwright journeys, Maestro smoke on an Android emulator. |
+| To be decided (question 16) | macOS | **ios**: `flutter build ios --no-codesign` for the `staging` flavor |
 
-- The macOS job runs on pull requests only because macOS minutes cost far more (GitHub bills them at a multiple of Linux minutes on private repositories), and an unsigned build is enough to catch iOS breakage before merging.
+**The iOS cost trade-off (question 16).** Estimates, because I could not check GitHub's current price page from here. On private repositories, GitHub has billed macOS minutes at about ten times Linux minutes; the Free plan includes 2,000 Linux-equivalent minutes a month and Team 3,000. An unsigned Flutter iOS build takes about 10 to 15 minutes, so 100 to 150 Linux-equivalent minutes each.
+
+| Option | Builds a month (rough) | Cost |
+| --- | --- | --- |
+| A. As ROADMAP says: every push and pull request | 300 to 450 | Far beyond the included minutes; very roughly USD 300 to 500 a month in extra minutes |
+| B. Pull requests to `main` that touch `apps/mobile` or `packages/design-tokens` (the architect's proposal) | 10 to 20 | About the size of the free allowance; at most a few tens of US dollars |
+| C. As B, plus a nightly build of `main` | 40 to 50 | Roughly USD 30 to 60 |
+
+A public repository has no minute charges, but makes the code public. Path filters for the Linux jobs would also save minutes, but they too depart from "every push builds all four apps", so they wait for the same answer.
+
+**Contract lint rules (C3).** release-manager adds `redocly.yaml` at the root in C3. The file is not added now. Its content, checked on 2026-11-18 against the current contract with @redocly/cli 2.80.0 (it passes, and it fails when an operation's `x-roles` is removed):
+
+```yaml
+extends:
+  - recommended
+rules:
+  rule/operation-x-roles:
+    subject: { type: Operation, property: x-roles }
+    assertions: { defined: true }
+    severity: error
+  rule/operation-x-rate-limit:
+    subject: { type: Operation, property: x-rate-limit }
+    assertions: { defined: true }
+    severity: error
+  rule/operation-x-idempotency-key:
+    subject: { type: Operation, property: x-idempotency-key }
+    assertions: { defined: true }
+    severity: error
+```
+
+A new endpoint without its roles, rate limits or idempotency note then fails CI.
+
+- **Secret scanning** with push protection is a GitHub repository setting for the owner to turn on, not a CI job.
 - Caches: the pnpm store, the pub cache, Gradle and the Flutter SDK.
 - Deployment to staging (from S1) and signed tester builds with Fastlane are added by release-manager once the host is chosen; they are outside S0.
 
@@ -913,18 +1114,23 @@ GitHub Actions, owned by release-manager. One workflow with one job per app, run
 1. **Hosting.** Choose option A, B or C (section 20) before S1. I recommend A.
 2. **Lawyer on data location.** Is hosting outside Egypt allowed for production, and what licence or permit does PDPL require? Staging can start before the answer.
 3. **Code vendors.** Choose the WhatsApp and SMS providers (section 7.3) and start Egyptian SMS sender ID registration and the Meta Business verification now, because both take time.
-4. **Vitest instead of Jest.** STACK.md lists Jest. NestJS 12's own template has moved to Vitest, and Jest is awkward with ES modules. I propose Vitest for the API and website unit tests (its test syntax is almost the same as Jest's). This changes a line in STACK.md, so it needs your approval.
+4. **Vitest instead of Jest.** STACK.md lists Jest. NestJS 12's own template has moved to Vitest, and Jest is awkward with ES modules. I propose Vitest for the API, website and contract tests (its test syntax is almost the same as Jest's). This changes a line in STACK.md, so it needs your approval. If you refuse, section 18.7 has the exact Jest list. Needed before C2.
 5. **Account deletion (C-04).** Approve the proposal in section 10, including the "sign in again within 10 minutes" step. With a lawyer: should a keyed hash of the phone be kept so no-show strikes survive deletion? Should deletion wait while a paid deposit is pending (from S6)? How long are anonymised records kept?
 6. **Analytics consent.** Must the app ask for consent before sending analytics, under PDPL? The design supports both.
 7. **Phone numbers.** Accept Egyptian numbers (+20) only at launch? (`auth.otp.allowed_country_codes`, changeable later.)
 8. **Name at sign-up.** May a new customer skip giving a name in S1? The proposal is yes: the app asks right after the first sign-in, the API allows it to be empty, and a name becomes required before the first booking in S4.
-9. **Admin sign-in (A-01).** Approve email, password and authenticator app, with admin accounts created only by the seed command that you run on the server (section 9).
+9. **Admin sign-in (A-01).** Approve email, password and authenticator app, with admin accounts created only by the seed command that you run on the server (section 9). Note the known weakness: anyone who knows an admin's email can lock that admin out for 15 minutes (section 9.1).
 10. **Deep links (C-08, S3).** Approve the free approach (no venue after an iOS install), or budget for a paid linking service.
 11. **Domain and app IDs.** Which domain will FeenGo use (for the API, the websites and shared links), and which app IDs (for example `app.feengo.customer`)? Needed before C6 for the IDs and before S1 staging for the domain.
 12. **Firebase projects.** Please create `feengo-dev`, `feengo-staging` and `feengo-prod` (or allow release-manager to prepare the steps for you). Needed for C7.
 13. **Environments.** Agree that there is no separately hosted development environment, and that production is set up shortly before the first public release.
 14. **Billing tables.** DECISIONS says the billing structure exists in the database "from the start". The proposal is to create the plan tables in S2, together with the venues they belong to, switched off. Agree?
-15. **Additional endpoint.** The contract adds `GET /v1/admin/me`, which was not in the S1 list, so the back office can show who is signed in after a page reload. Agree?
+15. **Additional endpoint.** The contract adds `GET /v1/admin/me`, which was not in the S1 list, so the back office can show who is signed in after a page reload, and every admin page checks the session through it (section 8.3). Agree?
+16. **iOS CI and path filters.** ROADMAP.md says the pipeline "builds all four apps on every push and pull request". Doing that for iOS on macOS costs far more than everything else (section 21, options A to C). Choose A (as written, several hundred US dollars a month), B (pull requests to `main` that touch the app, the architect's proposal), or C (B plus nightly). Also say whether Linux jobs may skip apps that did not change. Until you answer, Linux jobs run for every app on every push, and C10 waits. Needed before C10.
+17. **`customers` module.** STACK.md lists the modules auth, venues, availability, bookings, events, payments, notifications, settings and admin. The design adds `customers` for profile data (section 4.2). Agree?
+18. **Code rules as admin settings.** Make the code expiry, number of tries and lock time (and the resend and request limits) admin settings with the ranges in section 6.3, rather than fixed configuration? The defaults are the PRD's values either way. Needed before S1.
+19. **C-01 and "done" for S1.** ROADMAP.md says a slice is done when tests pass for all of its acceptance checks. C-01's check needs venue pages and booking, which come in S3 and S4, so S1 can only test part of it (section 23). Proposal: S1 counts as done with C-01's S1 part tested, and the rest of C-01 is checked in S3 and S4.
+20. **S1 testers, internal or external?** Internal TestFlight testers (members of your App Store Connect team, up to 100) need no review. External testers need Apple's Beta App Review, which needs a demo account that can sign in without a real phone. If S1 goes to external testers, the demo sign-in (Q-07) must be designed in S1 rather than before the public release.
 
 ## 23. Traceability
 
@@ -932,10 +1138,92 @@ GitHub Actions, owned by release-manager. One workflow with one job per app, run
 | --- | --- | --- | --- |
 | Q-02 | S0 | Section 16; `minSdk 26` and iOS 15.0 in C6; CI iOS build C10 | The shell builds for and runs on iOS 15 and Android 8; the ROADMAP done-check runs it on a real iPhone and Android phone. No version conflict found. |
 | Q-04 | S0 | Sections 11.4, 12 and 13 (contrast check in the token build); golden tests and Playwright screenshots at the largest text size (C6, C8, C9, C11) | Text follows the system size; every token pair passes WCAG AA in light and dark mode |
-| Q-06 | S0 | Section 15.1; increment C7 | The `foundation_test` event arrives in Firebase DebugView from both platforms. The full event list grows with each slice. |
-| C-01 | S1, partly | Section 11.1 (route guard and return path); no sign-in wall on the home screen | **S1 proves:** a visitor can open the app and use the home screen and the language and theme switch without an account; opening the profile, the only screen that needs an account in S1, sends the visitor to sign-in, and after signing in they return to the profile. **Not yet:** searching and opening venue pages (S3) and "booking asks them to sign in, then returns them" (S4), which reuse the same mechanism. |
-| C-02 | S1 | Section 7; settings in 6.3; `POST /v1/auth/otp/request`, `POST /v1/auth/otp/verify`, `POST /v1/auth/refresh`, `POST /v1/auth/logout`; tables `otp_challenges`, `devices`, `refresh_tokens` | Code by WhatsApp with SMS fallback (with the fake provider in CI and a real vendor on staging), expiry after 5 minutes, lock for 15 minutes after five wrong tries, limits per phone and per device |
+| Q-05 | S0, S1 | Security baseline mapped in sections 4.3 to 4.6 (headers, validation, roles, logging and redaction, client IP), 5.1 (database roles), 7 (code limits), 8 (tokens and web sessions), 9 (admin sign-in, append-only log), 19.3 (secrets), 20 (hosting baseline), 21 (dependency scan) | S0: secrets only in the environment, dependency scan in CI, the log-redaction test. S1: the code limits and race tests (section 7.5), the refresh tests (section 8.1), the forged-cookie tests (section 8.3), and the append-only test for the activity log. Hosting encryption and HTTPS are proved when staging is set up. |
+| Q-06 | S0 | Section 15.1; increment C7 | The `foundation_test` event is sent once with its parameters (unit test with a mocked analytics service) and arrives in Firebase DebugView from both platforms. The full event list grows with each slice. |
+| Q-07 | S1, partly | Section 10; `DELETE /v1/me` | **S1 proves** account deletion works inside the app. **Not yet:** the demo account for store reviewers, designed before the first public release, or in S1 if testers are external (question 20). |
+| C-01 | S1, partly | Section 11.1 (route guard and return path); no sign-in wall on the home screen | **S1 proves:** a visitor can open the app and use the home screen and the language switch without an account; opening the profile, the only screen that needs an account in S1, sends the visitor to sign-in, and after signing in they return to the profile. **Not yet:** searching and opening venue pages (S3) and "booking asks them to sign in, then returns them" (S4), which reuse the same mechanism. Whether this partial proof is enough for S1 to count as done is question 19. |
+| C-02 | S1 | Section 7; settings in 6.3; `POST /v1/auth/otp/request`, `POST /v1/auth/otp/verify`, `POST /v1/auth/refresh`, `POST /v1/auth/logout`; tables `otp_challenges`, `devices`, `refresh_tokens` | Code by WhatsApp, with SMS when WhatsApp refuses the message and SMS on request at resend (with the fake provider in CI and a real vendor on staging); expiry after 5 minutes, lock for 15 minutes after five wrong tries, limits per phone and per device, and the race tests in section 7.5. Late fallback after a WhatsApp delivery failure waits for the vendor choice (section 7.1). |
 | C-03 | S1 | Sections 11.3 and 14; `language` in `PATCH /v1/me` and `POST /v1/auth/otp/request`; `customers.language` | Every S1 screen works in both languages, Arabic right to left, and the choice is remembered on the phone and in the profile |
 | C-04 | S1 | Section 10; `GET`, `PATCH` and `DELETE /v1/me`; `customers` constraints | Name and optional email can be edited; deletion from inside the app removes personal data and ends every session |
-| A-01 | S1 | Sections 8.3 and 9.1 to 9.2; `POST /v1/admin/auth/sign-in`, `POST /v1/admin/auth/totp/verify`, `GET /v1/admin/me`; table `admin_users` | No admin screen or admin endpoint works without both the password and the authenticator code |
-| A-11 | S1 | Sections 5.3 and 9.3; `GET /v1/admin/activity-log`; table `admin_activity_log` with its grants and trigger | Sign-ins, sign-outs, locks and seed-command actions are recorded with who, what and when; a test shows that `UPDATE` and `DELETE` on the table fail |
+| A-01 | S1 | Sections 8.3 and 9.1 to 9.2; `POST /v1/admin/auth/sign-in`, `POST /v1/admin/auth/totp/verify`, `GET /v1/admin/me`; tables `admin_users`, `admin_sign_in_attempts` | No admin screen or admin endpoint works without both the password and the authenticator code, including with a forged cookie or the password step alone |
+| A-11 | S1 | Sections 5.3 and 9.3; `GET /v1/admin/activity-log`; table `admin_activity_log` with its grants and trigger | Sign-ins, sign-outs, locks, seed-command actions (with the operator's name) and settings changes are recorded with who, what and when; a test shows that `UPDATE`, `DELETE` and `TRUNCATE` on the table fail for the app role |
+
+## 24. Proposed decisions, awaiting the owner
+
+These are the architect's proposals of 2026-11-18. None is in `docs/DECISIONS.md` yet, because that file holds only decisions the owner has made. Each entry says how it is decided. "With this document" means approving this document approves it; "question N" means it is decided by the answer to that question in section 22. Once decided, each entry moves to `docs/DECISIONS.md` with the date of the owner's answer.
+
+### 24.1 Versions pinned for S0 and S1 (with this document)
+
+Node 26.13.1, pnpm 12.21.0, TypeScript 6.0.3, ESLint 9.39.5, PostgreSQL 18.7, Redis 8.10.3, Flutter 3.50.0, NestJS 12.5.1, Next.js 16.4.6, React 19.3.1, plus the exact lists in sections 17 and 18, all checked against their registries on 2026-11-18. TypeScript stays below 6.1 and ESLint on 9 because of the peer ranges of typescript-eslint and of the plugins in eslint-config-next.
+
+### 24.2 pnpm workspaces, no build orchestrator yet (with this document)
+
+The API, both websites, the shared packages and qa-tester's test packages form one pnpm workspace with one lockfile and exact versions. Flutter stays outside it and reads the tokens through a path dependency. Turborepo or Nx can be added later without moving folders. A shared web component package is created only when both websites need it. Root files and every CI job belong to release-manager; only one open pull request touches the lockfile at a time.
+
+### 24.3 NestJS 12 on Node 26 LTS, with TypeScript 6.0 (with this document); Vitest (question 4)
+
+NestJS 12 on Express, as ES modules, on Node 26, the active LTS release. Vitest 4 for tests, as NestJS 12's own template uses, because Jest is awkward with ES modules. Vitest replaces a line in STACK.md, so it waits for question 4; the Jest fallback list is in section 18.7.
+
+### 24.4 API conventions (with this document)
+
+Business endpoints under `/v1`; health unversioned. One RFC 9457 error shape with a stable `code` that clients translate, a `default` error response on every operation, and unknown body fields and query parameters rejected. Request validation with zod; responses checked against the contract in tests. Bodies never logged, wildcard redaction, provider calls never logged, and a test that proves a known code and token never reach the logs.
+
+### 24.5 Kysely for database access and migrations (with this document)
+
+Kysely and its migrator, types generated from the database. FeenGo's key rules are SQL features (row locks, partial indexes, check constraints, an append-only log) that Kysely writes directly, and every migration has an `up` and a `down`; down migrations are refused outside development. Prisma, Drizzle and TypeORM were considered and rejected (section 5.1). The API connects with a role that cannot change the schema or the activity log.
+
+### 24.6 "Venues near me" is a bounding box plus a distance formula (with this document)
+
+An indexed latitude and longitude box, then haversine sorting in a plain SQL function. No extension, works on every managed PostgreSQL, milliseconds at launch scale. `earthdistance` or PostGIS can be added later from the same columns.
+
+### 24.7 Settings stored as typed rows with admin limits, categories and versions (with this document)
+
+`setting_definitions` and `settings`, with platform and venue rows, an optional booking category on each row, admin limits per category, and a version per row. Containers cache platform settings and reload as soon as Redis announces a change. Every change writes a `setting.changed` activity entry; the R-04 change log comes in S4.
+
+### 24.8 Code rules as admin settings (question 18)
+
+The code expiry, number of wrong tries and lock time, and the resend and request limits, as admin settings with ranges, defaulting to the PRD's values.
+
+### 24.9 Phone codes behind one provider interface (with this document); vendor (question 3)
+
+The API makes the codes, stores only their HMAC, and hands them to a provider interface: WhatsApp first, SMS in the same request if WhatsApp refuses, SMS with a new code on request at resend, and a fake provider for local runs and CI. Late fallback through a signed delivery-receipt webhook is added once the vendor is chosen. Counters, locks and "only once" rules are atomic, in the places listed in section 7.5, with tests for each race.
+
+### 24.10 Short access tokens, rotating refresh tokens, no tokens in web pages (with this document)
+
+15-minute Ed25519 JWTs; random single-use refresh tokens stored as hashes, with one successor only, returned again within a 10-second grace period from an encrypted cache, and the whole session ended on later reuse. The app keeps the refresh token in the Keychain or Keystore. The websites keep tokens in HttpOnly cookies set only in route handlers and `proxy.ts`; every admin page checks the session through the API; the `mfaToken` waits in its own short cookie until the second step.
+
+### 24.11 Admin sign-in with email, password and an authenticator code (question 9)
+
+Argon2id password, then a TOTP code; admin accounts only from server commands that refuse to print secrets outside an interactive terminal and record the operator; failures and locks kept only in `admin_sign_in_attempts`; every admin action in the append-only `admin_activity_log`.
+
+### 24.12 Account deletion anonymises the customer and keeps business records (question 5)
+
+After a fresh sign-in within 10 minutes: personal fields removed, sessions revoked, devices removed, in one transaction across modules; booking and payment records from later slices kept without personal details. Subject to a lawyer.
+
+### 24.13 Flutter uses Riverpod and go_router (with this document)
+
+`flutter_riverpod` 3 without code generation, `go_router` with the sign-in redirect that returns the customer where they were (C-01), three flavors each with its own Firebase project. The theme follows the phone in S0.
+
+### 24.14 Design tokens built with Style Dictionary, outputs committed (with this document)
+
+W3C-format tokens, Style Dictionary 5 output to CSS, TypeScript and Dart, committed outputs checked in CI, and a contrast gate. C5 ships temporary dark-theme values that pass, from the designer's S0 placeholder spec; the real design replaces them with one edit.
+
+### 24.15 Translations stay in each product, in ICU format (with this document)
+
+ARB for the app, JSON with next-intl for the websites, the API only for text it sends; no shared package; a glossary for shared terms; key parity checked in CI; bilingual database text as `_en` and `_ar` columns.
+
+### 24.16 Q-02 phone versions confirmed (finding, with this document)
+
+Flutter 3.50.0 and the FlutterFire plugins need iOS 15.0 and Android API 24, so Q-02's iOS 15 and Android 8 (API 26) are supported without conflict. The iOS build must use Swift Package Manager.
+
+### 24.17 Deep links through Universal Links, App Links and the Play Install Referrer (question 10, provisional until S3)
+
+Firebase Dynamic Links is shut down. Free platform links with the Play Install Referrer, or a paid linking service if iOS deferred links are needed.
+
+### 24.18 CI cadence (question 16)
+
+Linux jobs for every app on every push and pull request. The iOS build on macOS for pull requests to `main` that touch the app or the tokens (option B in section 21), because running it on every push costs several hundred US dollars a month.
+
+### 24.19 Hosting (question 1)
+
+Option A, DigitalOcean in Frankfurt, recommended over Hetzner (cheapest, most work) and Google Cloud in Doha or Dammam (closest, dearest). Data location subject to the lawyer (question 2).

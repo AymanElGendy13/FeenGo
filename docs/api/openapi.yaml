@@ -22,13 +22,23 @@ info:
     - **Rate limits.** `x-rate-limit` on each operation describes its limits. Limits marked
       "setting" are read from the settings store (R-01); limits marked "config" come from
       environment configuration. A limited request gets `429` with a `Retry-After` header.
+      Everyday limits are per phone, device, email, session or user. Per-IP limits are high
+      ceilings against abuse only, because many customers share one carrier IP address. For
+      calls from the website servers, the client IP is the browser's, forwarded in
+      `X-FeenGo-Client-IP` and trusted only with a valid `X-FeenGo-Forwarding-Key`.
     - **Idempotency.** `x-idempotency-key` says whether the operation needs an `Idempotency-Key`
       header. No S0 or S1 operation needs one; booking and payment operations (S4, S6) will.
-    - **Unknown fields.** Request bodies reject properties that are not in the contract.
+    - **Unknown fields.** Request bodies reject properties that are not in the contract, and
+      requests reject query parameters that are not in the contract, both with
+      `400 VALIDATION_FAILED` and the field code `UNKNOWN_FIELD`.
+    - **Unexpected errors.** Every operation can answer `INTERNAL_ERROR` (500) or
+      `SERVICE_UNAVAILABLE` (503, for example when Redis or the database cannot be reached) in
+      the `Problem` shape; this is the `default` response. The only exception is
+      `GET /health/ready`, whose 503 carries the `Readiness` body instead.
     - **Request IDs.** Every response carries `X-Request-Id`. A client may send its own
       `X-Request-Id` (a UUID); otherwise the server makes one.
     - **Times** are UTC, in RFC 3339 format. **Phone numbers** are E.164, for example
-      `+201001234567`.
+      `+201000000000`.
   contact:
     name: FeenGo architect (docs/ARCHITECTURE.md)
   license:
@@ -68,7 +78,7 @@ paths:
         database outage never makes the platform restart healthy containers.
       security: []
       x-roles: [visitor]
-      x-rate-limit: 'config: 120 requests per minute per IP address, well above what container probes send'
+      x-rate-limit: 'config: ceiling of 1200 requests per minute per IP address, far above what probes send'
       x-idempotency-key: not needed
       responses:
         '200':
@@ -86,6 +96,8 @@ paths:
                 time: '2026-11-18T10:00:00Z'
         '429':
           $ref: '#/components/responses/RateLimited'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /health/ready:
     get:
@@ -98,7 +110,7 @@ paths:
         an instance only while it is ready.
       security: []
       x-roles: [visitor]
-      x-rate-limit: 'config: 60 requests per minute per IP address'
+      x-rate-limit: 'config: ceiling of 600 requests per minute per IP address; results are cached for 1 second, so a flood never reaches the database'
       x-idempotency-key: not needed
       responses:
         '200':
@@ -118,7 +130,9 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
         '503':
-          description: At least one dependency is down. The body says which.
+          description: |
+            At least one dependency is down. The body says which. This is the one error response
+            in the API that uses the `Readiness` body rather than `Problem`, so probes can read it.
           headers:
             X-Request-Id:
               $ref: '#/components/headers/X-Request-Id'
@@ -131,6 +145,8 @@ paths:
                 checks:
                   database: up
                   redis: down
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/auth/otp/request:
     post:
@@ -139,9 +155,13 @@ paths:
       summary: Send a sign-in code to a phone number
       description: |
         Starts sign-in or sign-up (C-02). The server makes a 6-digit code, stores only its hash
-        and sends it by WhatsApp. If WhatsApp fails, the server sends it by SMS. Calling this
-        again for the same phone after the resend cooldown sends a new code and ends the earlier
-        challenge.
+        and sends it by WhatsApp. If WhatsApp refuses the message during this request, the server
+        sends the same code by SMS in the same request. Calling this again for the same phone
+        after the resend cooldown makes a **new** code, replaces the stored hash and ends the
+        earlier challenge; with `channel: sms` the new code goes by SMS only.
+
+        Fallback after a later WhatsApp delivery failure needs the vendor's signed
+        delivery-receipt webhook, which is added to this contract once the vendor is chosen.
 
         The response is the same whether or not the phone already has an account, so the
         endpoint cannot be used to find out who is a customer.
@@ -153,7 +173,7 @@ paths:
         setting auth.otp.max_requests_per_phone_per_hour (default 5) per phone number;
         setting auth.otp.max_requests_per_device_per_hour (default 10) per installation ID;
         setting auth.otp.resend_cooldown_seconds (default 60) between codes to the same phone;
-        config 20 per hour per IP address.
+        config ceiling of 1000 per hour per IP address.
       x-idempotency-key: not needed. A repeated request inside the cooldown gets 429 OTP_RESEND_TOO_SOON and sends nothing.
       requestBody:
         required: true
@@ -162,7 +182,7 @@ paths:
             schema:
               $ref: '#/components/schemas/OtpRequest'
             example:
-              phone: '+201001234567'
+              phone: '+201000000000'
               installationId: 9b2f7c1e-3a4d-4e5f-8a6b-1c2d3e4f5a6b
               language: en
               channel: auto
@@ -236,6 +256,8 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/auth/otp/verify:
     post:
@@ -257,7 +279,7 @@ paths:
       x-roles: [visitor]
       x-rate-limit: |
         setting auth.otp.max_wrong_attempts (default 5) wrong codes per phone, then a lock of
-        setting auth.otp.lock_minutes (default 15); config 30 per hour per IP address.
+        setting auth.otp.lock_minutes (default 15); config ceiling of 2000 per hour per IP address.
       x-idempotency-key: not needed. A challenge can be used once; a repeat gets 409 OTP_ALREADY_USED.
       requestBody:
         required: true
@@ -344,6 +366,8 @@ paths:
           $ref: '#/components/responses/OtpLocked'
         '429':
           $ref: '#/components/responses/RateLimited'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/auth/refresh:
     post:
@@ -352,17 +376,22 @@ paths:
       summary: Swap a refresh token for new tokens
       description: |
         Used by the app and by the admin website's server. Each refresh token works once: the
-        response carries a new refresh token and the old one stops working (rotation).
+        response carries a new refresh token and the old one stops working (rotation). A token
+        never gets more than one successor, so a session is always a single chain.
 
-        If a refresh token that was already used is presented again after the grace period
-        (config `REFRESH_REUSE_GRACE_SECONDS`, default 10 seconds), the server treats it as
-        stolen and ends the whole session on every device that shares it.
+        - Presented again within the grace period (config `REFRESH_REUSE_GRACE_SECONDS`, default
+          10 seconds), the old token gets the **same** successor again, with a new access token.
+          This covers a retry after a lost response and two parallel refreshes.
+        - Presented again after the grace period, it is treated as stolen: `REFRESH_TOKEN_REUSED`,
+          and the whole session ends on every device that shares it.
+        - If the server has lost its short-lived copy of the successor, a repeat inside the grace
+          period gets `REFRESH_TOKEN_INVALID` and nothing new is issued.
 
-        Clients must send only one refresh at a time.
+        Clients should still send only one refresh at a time.
       security: []
       x-roles: [customer, admin]
-      x-rate-limit: 'config: 60 per hour per IP address'
-      x-idempotency-key: not needed. Rotation with a short grace period handles a retried request.
+      x-rate-limit: 'config: 30 per hour per session; ceiling of 5000 per hour per IP address'
+      x-idempotency-key: not needed. A retry within the grace period returns the same successor.
       requestBody:
         required: true
         content:
@@ -404,6 +433,8 @@ paths:
                 $ref: '#/components/schemas/Problem'
         '429':
           $ref: '#/components/responses/RateLimited'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/auth/logout:
     post:
@@ -427,6 +458,8 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '429':
           $ref: '#/components/responses/RateLimited'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/me:
     get:
@@ -452,6 +485,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '429':
           $ref: '#/components/responses/RateLimited'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
     patch:
       tags: [me]
       operationId: updateMyProfile
@@ -490,6 +525,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '429':
           $ref: '#/components/responses/RateLimited'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
     delete:
       tags: [me]
       operationId: deleteMyAccount
@@ -535,6 +572,8 @@ paths:
                 requestId: 7d1c9a52-0f3e-4b8a-9c6d-2e1f0a9b8c7d
         '429':
           $ref: '#/components/responses/RateLimited'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/admin/auth/sign-in:
     post:
@@ -548,14 +587,18 @@ paths:
         Wrong passwords count per email address, including addresses with no account, so the
         response never tells whether an account exists. At the `auth.admin.max_wrong_attempts`
         setting (default 5) the email is locked for the `auth.admin.lock_minutes` setting
-        (default 15).
+        (default 15). For an unknown email the server still runs a password check against a
+        dummy hash, so the response time does not reveal whether the account exists.
 
-        Called by the admin website's server, never by browser scripts.
+        Called by the admin website's server, never by browser scripts. The website keeps the
+        `mfaToken` in its own short-lived HttpOnly cookie and sets no session cookie until the
+        second step succeeds.
       security: []
       x-roles: [visitor]
       x-rate-limit: |
         setting auth.admin.max_wrong_attempts (default 5) wrong passwords per email, then a lock
-        of setting auth.admin.lock_minutes (default 15); config 20 per hour per IP address.
+        of setting auth.admin.lock_minutes (default 15); config 100 per hour per browser IP address
+        (forwarded by the admin website server).
       x-idempotency-key: not needed
       requestBody:
         required: true
@@ -588,6 +631,8 @@ paths:
           $ref: '#/components/responses/AdminLocked'
         '429':
           $ref: '#/components/responses/RateLimited'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/admin/auth/totp/verify:
     post:
@@ -605,7 +650,8 @@ paths:
       x-roles: [visitor]
       x-rate-limit: |
         3 wrong codes per mfaToken (then the token ends); wrong codes also count toward
-        setting auth.admin.max_wrong_attempts; config 20 per hour per IP address.
+        setting auth.admin.max_wrong_attempts; config 100 per hour per browser IP address
+        (forwarded by the admin website server).
       x-idempotency-key: not needed. The mfaToken is single-use.
       requestBody:
         required: true
@@ -650,6 +696,8 @@ paths:
           $ref: '#/components/responses/AdminLocked'
         '429':
           $ref: '#/components/responses/RateLimited'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/admin/me:
     get:
@@ -676,6 +724,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '429':
           $ref: '#/components/responses/RateLimited'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
   /v1/admin/activity-log:
     get:
@@ -757,6 +807,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '429':
           $ref: '#/components/responses/RateLimited'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
 
 components:
   securitySchemes:
@@ -783,6 +835,23 @@ components:
         minimum: 1
 
   responses:
+    UnexpectedError:
+      description: |
+        Codes: `INTERNAL_ERROR` (500, an unexpected fault; quote the request ID when reporting
+        it), `SERVICE_UNAVAILABLE` (503, the database or Redis cannot be reached; try again).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://docs.feengo.invalid/errors/SERVICE_UNAVAILABLE
+            title: Service unavailable
+            status: 503
+            code: SERVICE_UNAVAILABLE
+            requestId: 7d1c9a52-0f3e-4b8a-9c6d-2e1f0a9b8c7d
     ValidationFailed:
       description: |
         `VALIDATION_FAILED`: the request does not match the contract. `errors` lists each field
@@ -958,6 +1027,7 @@ components:
 
     Liveness:
       type: object
+      additionalProperties: false
       required: [status, version, time]
       properties:
         status:
@@ -972,6 +1042,7 @@ components:
 
     Readiness:
       type: object
+      additionalProperties: false
       required: [status, checks]
       properties:
         status:
@@ -979,6 +1050,7 @@ components:
           enum: [ok, unavailable]
         checks:
           type: object
+          additionalProperties: false
           required: [database, redis]
           properties:
             database:
@@ -1001,7 +1073,7 @@ components:
       description: E.164 mobile number.
       pattern: '^\+[1-9][0-9]{7,14}$'
       examples:
-        - '+201001234567'
+        - '+201000000000'
 
     InstallationId:
       type: string
@@ -1031,6 +1103,7 @@ components:
 
     OtpChallenge:
       type: object
+      additionalProperties: false
       required: [challengeId, channel, codeLength, expiresAt, resendAvailableAt]
       properties:
         challengeId:
@@ -1093,6 +1166,7 @@ components:
 
     TokenPair:
       type: object
+      additionalProperties: false
       required: [accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt]
       properties:
         accessToken:
@@ -1110,6 +1184,7 @@ components:
 
     CustomerSession:
       type: object
+      additionalProperties: false
       required: [tokens, customer, isNewCustomer]
       properties:
         tokens:
@@ -1122,6 +1197,7 @@ components:
 
     Customer:
       type: object
+      additionalProperties: false
       required: [id, phone, name, email, language, createdAt]
       properties:
         id:
@@ -1178,6 +1254,7 @@ components:
 
     AdminMfaChallenge:
       type: object
+      additionalProperties: false
       required: [mfaToken, mfaTokenExpiresAt]
       properties:
         mfaToken:
@@ -1203,6 +1280,7 @@ components:
 
     AdminSession:
       type: object
+      additionalProperties: false
       required: [tokens, admin]
       properties:
         tokens:
@@ -1212,6 +1290,7 @@ components:
 
     AdminUser:
       type: object
+      additionalProperties: false
       required: [id, email, name, role]
       properties:
         id:
@@ -1230,19 +1309,25 @@ components:
     ActivityAction:
       type: string
       description: |
-        Actions logged in S1. Each later slice adds its own, for example `venue.approved` (S2)
-        or `booking.refunded` (S6).
+        Actions logged in S1. `setting.changed` records a settings change: its target type is
+        `setting`, its target ID the key, and `details` holds `key`, `scope`, `venueId`,
+        `bookingCategoryId`, `oldValue`, `newValue`, `oldVersion` and `newVersion`. Entries
+        with `actorType: system` hold the operator's name in `details.operator`. Each later
+        slice adds its own actions, for example `venue.approved` (S2) or `booking.refunded` (S6).
       enum:
         - admin.created
         - admin.signed_in
         - admin.signed_out
         - admin.sign_in_failed
         - admin.locked
+        - admin.unlocked
         - admin.totp_reset
         - admin.disabled
+        - setting.changed
 
     ActivityLogEntry:
       type: object
+      additionalProperties: false
       required: [id, occurredAt, actorType, actorAdminId, action, targetType, targetId, reason, details]
       properties:
         id:
@@ -1254,7 +1339,7 @@ components:
           format: date-time
         actorType:
           type: string
-          description: '`admin` for an action in the back office, `system` for a server command such as the admin seed.'
+          description: '`admin` for an action in the back office, `system` for a server command such as the admin seed (the operator is named in `details.operator`).'
           enum: [admin, system]
         actorAdminId:
           type: [string, 'null']
@@ -1278,6 +1363,7 @@ components:
 
     ActivityLogPage:
       type: object
+      additionalProperties: false
       required: [items, nextCursor]
       properties:
         items:
