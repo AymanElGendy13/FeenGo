@@ -66,7 +66,10 @@ Each feature in a slice goes through architect, then ui-ux-designer, then builde
 
 Keep this section updated as the project grows.
 
-- Start local services: `docker compose up -d`
-- Backend: `cd apps/api && npm run start:dev`
+- Requirements: Node 26.13.1 (`nvm use` reads `.nvmrc`; cloud sessions get it from the session-start hook). pnpm comes from `packageManager`: any pnpm 10 or later switches to 12.21.0 by itself.
+- Install: `pnpm install` at the root
+- Lint and format: `pnpm lint`, `pnpm format:check` (`pnpm format` to fix)
+- Start local services: `cp .env.example .env` once, then `docker compose up -d`. Stop: `docker compose down`. Reset the database: `docker compose down -v`
+- Backend: `pnpm --filter @feengo/api start:dev`. Checks: `pnpm --filter @feengo/api lint`, `typecheck`, `test` (the tests need the local services running)
 - Mobile: `cd apps/mobile && flutter run`
 - Dashboards: `cd apps/partner-web && npm run dev`, `cd apps/admin-web && npm run dev`
