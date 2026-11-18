@@ -47,7 +47,7 @@ Each feature in a slice goes through architect, then ui-ux-designer, then builde
   - all tests pass, and once CI exists (S0 increment C3) every CI check on the pull request is green;
   - the pull request records no decision and answers no question that the owner has not given in their own words (in the conversation or on GitHub). A proposal stays a proposal until the owner answers it.
 
-  The main session never merges with a failing or missing check, never bypasses branch protection, and never merges anything that releases to testers or stores; those stay with the owner. After each merge it posts a short summary on the pull request and tells the owner. If there is any doubt, the pull request waits for the owner. No subagent merges. The owner can revert any merge.
+  The main session never merges while a check is failing or, from C3, while a required check has not run; never bypasses branch protection; never merges a pull request that removes or weakens a test, a CI check or branch protection, which waits for the owner; and never merges anything that releases to testers or stores, or submits to a store, which stays with the owner. After each merge it posts a short summary on the pull request and tells the owner. If there is any doubt, the pull request waits for the owner. No subagent merges. The owner can revert any merge.
 - Change `docs/api/openapi.yaml` before the code that uses it.
 - Each folder under `apps/` has one owning subagent. Two subagents never edit the same files at the same time.
 - Record every significant decision in `docs/DECISIONS.md`.

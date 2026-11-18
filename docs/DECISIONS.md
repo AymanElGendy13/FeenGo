@@ -8,7 +8,7 @@ The API, website and contract tests use Vitest, not the Jest that `docs/STACK.md
 
 ## 2026-11-18: Node 26 through the session hook, nvm and setup-node
 
-Node 26.13.1 reaches every environment without changing `package.json`. In cloud sessions, `.claude/hooks/session-start.sh` installs Node 26.13.1 from nodejs.org, checks its SHA-256 checksum, caches the unpacked Node for later sessions and writes PATH to `$CLAUDE_ENV_FILE`, so it applies to the whole session. Developer machines run `nvm use`, which reads `.nvmrc`. CI uses `actions/setup-node` with `node-version-file: .nvmrc`. The Docker images pin Node themselves. The cloud container has Node 22, and pnpm's own Node download (`devEngines.runtime`) failed there because it also fetches checksums from a host the cloud network refuses, so this fixes the one environment that lacks Node 26 with tools that already work everywhere else. Release-manager writes the hook change, and the owner merges it. Decided by the owner.
+Node 26.13.1 reaches every environment without changing `package.json`. In cloud sessions, `.claude/hooks/session-start.sh` installs Node 26.13.1 from nodejs.org, checks its SHA-256 checksum, caches the unpacked Node for later sessions and writes PATH to `$CLAUDE_ENV_FILE`, so it applies to the whole session. Developer machines run `nvm use`, which reads `.nvmrc`. CI uses `actions/setup-node` with `node-version-file: .nvmrc`. The Docker images pin Node themselves. The cloud container has Node 22, and pnpm's own Node download (`devEngines.runtime`) failed there because it also fetches checksums from a host the cloud network refuses, so this fixes the one environment that lacks Node 26 with tools that already work everywhere else. Release-manager writes the hook change; it is merged under the rule in `CLAUDE.md`. Decided by the owner.
 
 ## 2026-11-18: Add @eslint/js
 
@@ -16,7 +16,7 @@ Node 26.13.1 reaches every environment without changing `package.json`. In cloud
 
 ## 2026-11-18: The main Claude session merges pull requests
 
-Replaces "Two-tier merging" below. The owner made the main Claude session responsible for merging every pull request, once the reviewer approves with no open findings, tests pass (and, from C3, CI is green), and the pull request records no decision or answer the owner has not given. Releases to testers and stores stay with the owner, and no subagent merges. The main session posts a summary on each merged pull request and tells the owner, who can revert any merge. Reason: the owner wants work to flow without waiting on them for every merge, while keeping every product, cost and legal decision in their own hands. The exact rule is in `CLAUDE.md`. Decided by the owner.
+Replaces "Two-tier merging" below. The owner made the main Claude session responsible for merging every pull request, once the reviewer approves with no open findings, tests pass (and, from C3, CI is green), and the pull request records no decision or answer the owner has not given. Releases to testers or stores, store submission, and any pull request that removes or weakens a test, a CI check or branch protection stay with the owner, and no subagent merges. The main session posts a summary on each merged pull request and tells the owner, who can revert any merge. Reason: the owner wants work to flow without waiting on them for every merge, while keeping every product, cost and legal decision in their own hands. The exact rule is in `CLAUDE.md`. Decided by the owner.
 
 ## 2026-11-18: Two-tier merging (replaced by the entry above)
 
