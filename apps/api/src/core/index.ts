@@ -9,7 +9,7 @@ export {
   type EnvSource,
 } from './config/config.schema.js';
 export { CoreModule, type CoreOptions } from './core.module.js';
-export { DATABASE, type Database } from './database/database.js';
+export { moduleDatabaseProvider, type Database, type ModuleDatabase } from './database/database.js';
 export {
   buildProblem,
   ProblemException,

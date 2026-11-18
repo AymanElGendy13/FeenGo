@@ -1,13 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Redis } from 'ioredis';
-import { sql, type Kysely } from 'kysely';
-import { DATABASE, REDIS, type Database } from '../core/index.js';
+import { sql } from 'kysely';
+import { REDIS } from '../core/index.js';
+import { HEALTH_DATABASE, type HealthDatabase } from './health.database.js';
 
 /** One round trip to each dependency. Each resolves when it is up and rejects otherwise. */
 @Injectable()
 export class DependencyProbes {
   constructor(
-    @Inject(DATABASE) private readonly db: Kysely<Database>,
+    @Inject(HEALTH_DATABASE) private readonly db: HealthDatabase,
     @Inject(REDIS) private readonly redisClient: Redis,
   ) {}
 

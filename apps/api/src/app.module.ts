@@ -1,6 +1,7 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import { CoreModule, type CoreOptions } from './core/index.js';
 import { HealthModule } from './health/index.js';
+import { SettingsModule } from './settings/index.js';
 
 export type AppModuleOptions = CoreOptions;
 
@@ -10,7 +11,7 @@ export class AppModule {
   static forRoot(options: AppModuleOptions = {}): DynamicModule {
     return {
       module: AppModule,
-      imports: [CoreModule.forRoot(options), HealthModule],
+      imports: [CoreModule.forRoot(options), HealthModule, SettingsModule],
     };
   }
 }
