@@ -4,24 +4,26 @@
 # data volume is empty. To run it again: `docker compose down -v`, then `up -d`.
 #
 #   feengo_migrator  owns the database and the public schema, and runs migrations.
-#   feengo_app       what the API connects as: SELECT, INSERT, UPDATE, DELETE on
-#                    tables the migrator creates, and no DDL. Tables that need
-#                    less (admin_activity_log: SELECT, INSERT only) revoke the rest
-#                    in their own migration.
+#   feengo_app       what the API connects as: CONNECT on the database, SELECT,
+#                    INSERT, UPDATE, DELETE on tables the migrator creates, no DDL
+#                    and no temporary tables. Tables that need less
+#                    (admin_activity_log: SELECT, INSERT only) revoke the rest in
+#                    their own migration.
 #
 # Passwords come from the container environment (see docker-compose.yml and
-# .env.example). They are passed to psql as variables, never pasted into SQL.
+# .env.example). psql reads them with \getenv (psql 15+), so they never appear on
+# a command line (and so not in `ps`), and inserts them with :'var' quoting, so
+# quotes in a password are safe.
 set -euo pipefail
 
 : "${FEENGO_MIGRATOR_PASSWORD:?FEENGO_MIGRATOR_PASSWORD must be set}"
 : "${FEENGO_APP_PASSWORD:?FEENGO_APP_PASSWORD must be set}"
 
-psql -v ON_ERROR_STOP=1 \
-  --username "$POSTGRES_USER" \
-  --dbname "$POSTGRES_DB" \
-  -v db_name="$POSTGRES_DB" \
-  -v migrator_password="$FEENGO_MIGRATOR_PASSWORD" \
-  -v app_password="$FEENGO_APP_PASSWORD" <<'SQL'
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'SQL'
+\getenv db_name POSTGRES_DB
+\getenv migrator_password FEENGO_MIGRATOR_PASSWORD
+\getenv app_password FEENGO_APP_PASSWORD
+
 CREATE ROLE feengo_migrator
   LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS
   PASSWORD :'migrator_password';
@@ -35,7 +37,7 @@ CREATE ROLE feengo_app
 ALTER DATABASE :"db_name" OWNER TO feengo_migrator;
 
 REVOKE ALL ON DATABASE :"db_name" FROM PUBLIC;
-GRANT CONNECT, TEMPORARY ON DATABASE :"db_name" TO feengo_app;
+GRANT CONNECT ON DATABASE :"db_name" TO feengo_app;
 
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO feengo_app;

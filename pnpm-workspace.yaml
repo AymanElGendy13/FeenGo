@@ -27,6 +27,7 @@ peerDependencyRules:
 
 # pnpm 12 holds back versions published less than a day ago. @redocly/cli 2.80.0
 # (section 18.1) was published on 2026-11-18, the day C1 was built, so pnpm added
-# this exact-version exception. Remove it in the next dependency pull request.
+# this exact-version exception. Remove it once pnpm's age limit clears for
+# @redocly/cli@2.80.0, after 2026-11-19 13:11 UTC.
 minimumReleaseAgeExclude:
   - "@redocly/cli@2.80.0"

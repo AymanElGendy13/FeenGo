@@ -5,7 +5,7 @@
   "description": "FeenGo workspace root: shared scripts and dev tools only.",
   "packageManager": "pnpm@12.21.0",
   "engines": {
-    "node": "26.13.1"
+    "node": ">=26.13.1 <27"
   },
   "scripts": {
     "lint": "eslint .",
