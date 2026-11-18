@@ -38,6 +38,7 @@ Record each of these in `docs/ARCHITECTURE.md` before S0 code starts:
 - Session and token approach for the app and the websites.
 - How settings (R-01) are stored, cached and versioned.
 - Environments, configuration and secrets handling.
+- Two or three low-cost Docker hosting options for the owner to choose from before S1, with monthly costs and how each meets the security baseline. AWS waits until scaling.
 
 ## Principles
 
