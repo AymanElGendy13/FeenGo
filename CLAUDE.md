@@ -39,7 +39,7 @@ Each feature in a slice goes through architect, then ui-ux-designer, then builde
 
 - Before every task, run `git fetch origin` and bring your branch up to date with `origin/main`: fast-forward it, or merge `origin/main` if the branch has its own commits. Never rebase a branch that has been pushed. Never work from a stale checkout. Cloud sessions do this automatically at start through `.claude/hooks/session-start.sh`.
 - Work only on the current slice in `docs/ROADMAP.md`. Do not build ahead.
-- Deliver work as small, single-feature pull requests. Each feature pull request is reviewed and merged before the next one starts.
+- Deliver work as small, single-feature pull requests. Each feature pull request is reviewed and merged before the next one starts. Design specs and documents for the next slice may be prepared alongside.
 - Plan before editing. For anything bigger than a small fix, present a plan and wait for approval.
 - Work on a branch named `<slice>/<requirement-id>-<short-name>`, for example `s1/c-02-otp-login`. Never commit to `main`.
 - Every change reaches `main` through a pull request, after tests pass, the reviewer subagent approves, and the owner approves.
