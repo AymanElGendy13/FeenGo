@@ -37,6 +37,7 @@ Order within a slice: architect, then ui-ux-designer, then builders in parallel,
 
 ## How we work
 
+- Before every task, run `git fetch origin` and bring your branch up to date with `origin/main`. Never work from a stale checkout. Cloud sessions do this automatically at start through `.claude/hooks/session-start.sh`.
 - Work only on the current slice in `docs/ROADMAP.md`. Do not build ahead.
 - Plan before editing. For anything bigger than a small fix, present a plan and wait for approval.
 - Work on a branch named `<slice>/<requirement-id>-<short-name>`, for example `s1/c-02-otp-login`. Never commit to `main`.
