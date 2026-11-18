@@ -1,0 +1,32 @@
+# Keeps the Docker build context small and free of secrets. Images are built from
+# the repository root: docker build -f apps/api/Dockerfile .
+
+# Secrets: never inside an image. .env.example holds placeholders only.
+.env
+.env.*
+!.env.example
+**/*.keystore
+**/*.jks
+**/*.p12
+**/*.mobileprovision
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Dependencies and build output: installed and built inside the image.
+**/node_modules
+**/dist
+**/.next
+**/build
+**/coverage
+**/*.tsbuildinfo
+
+# Not needed to build any image.
+.git
+.github
+.claude
+docs
+store
+apps/mobile
+**/.DS_Store
+**/.idea
+**/.vscode

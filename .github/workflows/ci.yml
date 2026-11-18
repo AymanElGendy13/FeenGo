@@ -1,0 +1,204 @@
+# FeenGo CI (docs/ARCHITECTURE.md section 21).
+#
+# Every push to any branch and every pull request runs every job, with no path
+# filters, until the owner answers question 16. Jobs for the websites, the design
+# tokens and the app arrive with the increments that create them (section 3).
+#
+# Branch protection requires one check only: "CI passed" (job ci-summary), which
+# fails unless every other job succeeded.
+#
+# No secrets are used. Every password below is a throwaway value for the service
+# containers of a single run, which are destroyed when the job ends.
+#
+# Every action is pinned to a full commit SHA; the comment gives its release.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API (lint, type check, tests, Docker build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.7-alpine3.24
+        env:
+          # Throwaway CI value, not a secret.
+          POSTGRES_PASSWORD: ci-superuser-password
+          POSTGRES_DB: feengo
+        ports:
+          - 5432:5432
+        # TCP check, as in docker-compose.yml: the image's first-start server
+        # listens on its Unix socket only, so this waits for the real server.
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -p 5432 -U postgres -d feengo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:8.10.3-alpine3.23
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm (version from packageManager)
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # 01-create-roles.sh reads its passwords with \getenv, which needs psql 15+.
+      - name: Check psql is version 15 or later
+        run: |
+          major=0
+          if command -v psql > /dev/null; then
+            psql --version
+            major="$(psql --version | sed -E 's/^[^0-9]*([0-9]+).*/\1/')"
+          fi
+          if [ "$major" -lt 15 ]; then
+            echo "psql is missing or older than 15; installing postgresql-client-18 from PGDG."
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+              https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+              | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+            sudo apt-get update -q
+            sudo apt-get install -y -q postgresql-client-18
+            psql --version
+          fi
+
+      # Service containers start before checkout, so they cannot mount
+      # docker/postgres/initdb/. The script runs here instead, from the runner
+      # (section 21, "Notes for C3").
+      - name: Create the database roles
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          # Throwaway CI values for this run's service container, not secrets.
+          PGPASSWORD: ci-superuser-password
+          POSTGRES_USER: postgres
+          POSTGRES_DB: feengo
+          FEENGO_MIGRATOR_PASSWORD: ci-migrator-password
+          FEENGO_APP_PASSWORD: ci-app-password
+        run: ./docker/postgres/initdb/01-create-roles.sh
+
+      - name: Lint (repository)
+        run: pnpm lint
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint (API)
+        run: pnpm --filter @feengo/api lint
+
+      - name: Type check (API)
+        run: pnpm --filter @feengo/api typecheck
+
+      - name: Unit and API tests
+        env:
+          APP_ENV: test
+          # The API connects as feengo_app, never as the superuser. Throwaway CI
+          # password, set in "Create the database roles" above.
+          DATABASE_URL: postgres://feengo_app:ci-app-password@127.0.0.1:5432/feengo
+          REDIS_URL: redis://127.0.0.1:6379
+        run: pnpm --filter @feengo/api test
+
+      # Built only, never pushed.
+      - name: Docker build
+        run: docker build --file apps/api/Dockerfile --tag feengo-api:ci .
+
+  contract:
+    name: Contract lint (Redocly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm (version from packageManager)
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Rules in redocly.yaml at the root. Telemetry off: no usage data leaves CI.
+      - name: Lint openapi.yaml
+        env:
+          REDOCLY_TELEMETRY: 'off'
+        run: pnpm contract:lint
+
+  security:
+    name: Dependency scan (OSV-Scanner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Fails the job when a known vulnerability is found, or when the scan
+      # itself fails. Later increments add their lockfiles here (pubspec.lock
+      # with the app in C6).
+      - name: Scan lockfiles
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
+        with:
+          scan-args: |-
+            --lockfile=./pnpm-lock.yaml
+
+  ci-summary:
+    name: CI passed
+    if: always()
+    needs: [api, contract, security]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check every job succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          if [ -z "$RESULTS" ]; then
+            echo "::error::No job results to check."
+            exit 1
+          fi
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "::error::At least one CI job did not succeed."
+              exit 1
+            fi
+          done
