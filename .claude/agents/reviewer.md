@@ -38,4 +38,4 @@ The change itself, then the parts of `CLAUDE.md`, `docs/PRD.md`, `docs/STACK.md`
 
 ## Report format
 
-Findings grouped by severity, most serious first. For each one: the file and line, the problem, and a suggested fix. Finish with one line: approve, or changes needed. When you approve, add one more line saying which merge tier applies under the rule in `CLAUDE.md`: "owner merge" or "auto-merge eligible", with the reason. When in doubt, say "owner merge".
+Findings grouped by severity, most serious first. For each one: the file and line, the problem, and a suggested fix. Finish with one line: approve, or changes needed. When you approve, add one more line saying who merges under the rule in `CLAUDE.md`: "main session may merge", or "owner must decide first" with the decision or release that needs the owner. When in doubt, say "owner must decide first".
