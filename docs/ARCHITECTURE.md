@@ -230,6 +230,8 @@ These are notes raised in the C2 review, not decisions. Each one is settled at t
 - **By C3 or S1: health-probe log volume.** Log health 2xx at `debug` and readiness 503 at `warn`.
 - **Before the first table (C4 or S1): narrowed Kysely typing per module.** Section 4.2 gives each module a `Kysely<Pick<Database, ...>>` with only its own tables. Today core exports the full `Kysely<Database>`.
 - **For the Dockerfile in C3.** `.dockerignore` must exclude `.env`. The image must keep `package.json` next to `dist/`, because the API reads its version from it.
+- **Before S1: Errors nested below the top level of a log object.** `formatters.log` sends a top-level `Error` through the serializer, but one nested deeper (for example `{ ctx: { error } }`) is written with its own fields, so a database error's `detail`, `where` and `parameters` would reach the log. Either serialize Errors one level down as well, or require every error to be logged under `err`, with a lint rule or test that enforces it.
+- **With S1's first request body: field-error codes.** C2's validation pipe reports unknown fields as `UNKNOWN_FIELD` and any other mismatch as `NOT_ALLOWED_VALUE`, which only unknown query parameters can reach today. Before the first body schema, map zod issues to specific codes so clients show the right message: a missing field to `REQUIRED`, `too_big` to `TOO_LONG`, `too_small` to `TOO_SHORT`, `invalid_format` to the matching `FORMAT_*` code.
 
 ## 5. Database: access layer, migrations and data model
 
