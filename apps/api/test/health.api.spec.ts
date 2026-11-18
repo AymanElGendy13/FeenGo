@@ -6,7 +6,8 @@ import { READINESS_CACHE_MS } from '../src/health/readiness.service.js';
 import { createTestApp } from './support/app.js';
 import { expectContractResponse, expectSchema } from './support/contract.js';
 import { testEnv, withPort } from './support/env.js';
-import { closedPort, silentServer } from './support/network.js';
+import { LogCapture } from './support/logs.js';
+import { closedPort, silentServer, tcpRelay } from './support/network.js';
 
 // API tests against the real Compose Postgres and Redis (docker compose up -d --wait).
 // "Down" is a test app pointed at a port nothing listens on, or at a server that
@@ -111,6 +112,32 @@ describe('health with both dependencies up', () => {
     expect(res.text).not.toContain('nothing-here');
   });
 
+  it('S0 health rejects unknown query parameters with 400 UNKNOWN_FIELD', async () => {
+    const probes = app.get(DependencyProbes);
+    const database = vi.spyOn(probes, 'database');
+    for (const path of ['/health', '/health/ready']) {
+      const res = await request(app.getHttpServer()).get(`${path}?phone=%2B201001234567&debug=1`);
+      expect(res.status).toBe(400);
+      expect(res.headers['content-type']).toMatch(/^application\/problem\+json/);
+      expectContractResponse(path, 'get', res);
+      expect(res.body).toEqual({
+        type: 'https://docs.feengo.invalid/errors/VALIDATION_FAILED',
+        title: 'The request is not valid',
+        status: 400,
+        code: 'VALIDATION_FAILED',
+        requestId: res.headers['x-request-id'],
+        errors: [
+          { field: '/phone', code: 'UNKNOWN_FIELD' },
+          { field: '/debug', code: 'UNKNOWN_FIELD' },
+        ],
+      });
+      // The parameter's name is reported, never its value.
+      expect(res.text).not.toContain('201001234567');
+    }
+    // Refused before the readiness check runs.
+    expect(database).not.toHaveBeenCalled();
+  });
+
   it('S0 health routes are unversioned', async () => {
     const res = await request(app.getHttpServer()).get('/v1/health');
     expect(res.status).toBe(404);
@@ -145,6 +172,59 @@ describe('health with Redis unreachable', () => {
     const res = await request(app.getHttpServer()).get('/health');
     expect(res.status).toBe(200);
     expectContractResponse('/health', 'get', res);
+  });
+});
+
+describe('health when the Redis connection is lost after start-up', () => {
+  const logs = new LogCapture();
+  let app: NestExpressApplication;
+  let relay: Awaited<ReturnType<typeof tcpRelay>>;
+
+  beforeAll(async () => {
+    const env = testEnv({ LOG_LEVEL: 'info' });
+    const redisUrl = new URL(env.REDIS_URL ?? '');
+    relay = await tcpRelay(redisUrl.hostname, Number(redisUrl.port || 6379));
+    app = await createTestApp({
+      env: { ...env, REDIS_URL: withPort(env.REDIS_URL, relay.port) },
+      logDestination: logs,
+    });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await relay.close();
+  });
+
+  it('S0 health readiness reports Redis down with 503 after its connection is lost, and 200 once it is back', async () => {
+    const server = app.getHttpServer();
+    const first = await request(server).get('/health/ready');
+    expect(first.status).toBe(200);
+    expect(first.body).toEqual({ status: 'ok', checks: { database: 'up', redis: 'up' } });
+
+    await relay.close();
+    await new Promise((resolve) => setTimeout(resolve, READINESS_CACHE_MS + 50));
+    const lost = await request(server).get('/health/ready');
+    expect(lost.status).toBe(503);
+    expectContractResponse('/health/ready', 'get', lost);
+    expect(lost.body).toEqual({
+      status: 'unavailable',
+      checks: { database: 'up', redis: 'down' },
+    });
+
+    await relay.open();
+    await vi.waitFor(
+      async () => {
+        const back = await request(server).get('/health/ready');
+        expect(back.status).toBe(200);
+        expect(back.body).toEqual({ status: 'ok', checks: { database: 'up', redis: 'up' } });
+      },
+      { timeout: 10_000, interval: 250 },
+    );
+
+    const messages = logs.entries().map((entry) => entry.msg);
+    expect(messages).toContain('redis connection lost');
+    expect(messages).toContain('redis connection restored');
+    expect(messages).not.toContain('redis could not connect');
   });
 });
 

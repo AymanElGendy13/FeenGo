@@ -1,6 +1,8 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import type { Logger } from 'pino';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ROOT_LOGGER } from '../src/core/index.js';
 import { createTestApp } from './support/app.js';
 import { testEnv } from './support/env.js';
 import { LogCapture } from './support/logs.js';
@@ -20,6 +22,8 @@ const KNOWN = {
   email: 'known.person@example.com',
   name: 'Known Person Name',
 } as const;
+
+const REDACTED = '[Redacted]';
 
 describe('logging', () => {
   const logs = new LogCapture();
@@ -64,19 +68,21 @@ describe('logging', () => {
   }
 
   it('S0 the request log line holds method, route pattern, status, duration and request ID', async () => {
+    // The health routes take no query parameters, so this one is refused (400).
     const res = await request(app.getHttpServer()).get('/health?phone=%2B201001234567');
+    expect(res.status).toBe(400);
     await waitForRequestLines(1);
     const [line] = requestLines();
     expect(line).toMatchObject({
-      level: 30,
+      level: 40,
       msg: 'request completed',
       requestId: res.headers['x-request-id'],
       method: 'GET',
       route: '/health',
-      statusCode: 200,
+      statusCode: 400,
+      errorCode: 'VALIDATION_FAILED',
     });
     expect(line?.responseTime).toBeTypeOf('number');
-    expect(line).not.toHaveProperty('errorCode');
     // Never the raw URL, headers or a body.
     expect(JSON.stringify(line)).not.toContain('phone');
     for (const key of ['req', 'res', 'url', 'headers', 'body']) {
@@ -161,6 +167,8 @@ describe('logging', () => {
       request(server).get('/test/planted-failure').set(headers),
     ]);
     await waitForRequestLines(responses.length);
+    // The health routes take no query parameters.
+    expect(responses[1]?.status).toBe(400);
 
     // Not vacuous: one request line per request, each with its own request ID.
     const ids = requestLines().map((line) => line.requestId);
@@ -188,6 +196,70 @@ describe('logging', () => {
     // The phone number in any common shape, and the code in the URL-encoded query.
     expect(everything).not.toContain(KNOWN.phone.slice(1));
     expect(everything).not.toContain(encodeURIComponent(KNOWN.phone));
+  });
+
+  it('Q-05 logs redact every header and key listed in section 4.5', () => {
+    // Written out by hand from docs/ARCHITECTURE.md section 4.5, so that removing a
+    // redaction path fails this test.
+    const requestHeaders = ['authorization', 'cookie', 'x-feengo-forwarding-key'];
+    const responseHeaders = ['set-cookie'];
+    const keys = [
+      'password',
+      'code',
+      'accessToken',
+      'refreshToken',
+      'tokens',
+      'mfaToken',
+      'otpauth',
+      'secret',
+      'name',
+      'email',
+      'phone',
+      'to',
+      'phone_e164',
+    ];
+    const known = (where: string, key: string) => `known-${where}-${key}-value-7c41`;
+    const logger = app.get<Logger>(ROOT_LOGGER);
+
+    for (const key of keys) {
+      logger.info(
+        { [key]: known('top', key), nested: { [key]: known('nested', key) } },
+        `redaction check ${key}`,
+      );
+    }
+    for (const header of requestHeaders) {
+      logger.info({ req: { headers: { [header]: known('request', header) } } }, 'header check');
+    }
+    for (const header of responseHeaders) {
+      logger.info({ res: { headers: { [header]: known('response', header) } } }, 'header check');
+    }
+
+    const entries = logs.entries();
+    for (const key of keys) {
+      const entry = entries.find((line) => line.msg === `redaction check ${key}`);
+      expect(entry, `nothing was logged for ${key}`).toBeDefined();
+      const nested = entry?.nested as Record<string, unknown> | undefined;
+      for (const [where, value] of [
+        ['top-level', entry?.[key]],
+        ['nested', nested?.[key]],
+      ] as const) {
+        expect([REDACTED, undefined], `${where} ${key} is not redacted`).toContain(value);
+      }
+    }
+    expect(entries.filter((line) => line.msg === 'header check')).toHaveLength(
+      requestHeaders.length + responseHeaders.length,
+    );
+    const everything = [...logs.lines, ...written].join('\n');
+    for (const key of keys) {
+      expect(everything, `${key} appears in the logs`).not.toContain(known('top', key));
+      expect(everything, `nested ${key} appears in the logs`).not.toContain(known('nested', key));
+    }
+    for (const header of requestHeaders) {
+      expect(everything, `${header} appears in the logs`).not.toContain(known('request', header));
+    }
+    for (const header of responseHeaders) {
+      expect(everything, `${header} appears in the logs`).not.toContain(known('response', header));
+    }
   });
 
   it('Q-05 error codes survive redaction', async () => {

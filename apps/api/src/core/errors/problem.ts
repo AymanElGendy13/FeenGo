@@ -30,6 +30,14 @@ const TITLES: Record<ErrorCode, string> = {
   SERVICE_UNAVAILABLE: 'Service unavailable',
 };
 
+/** One field that failed validation (contract: FieldError). Only with VALIDATION_FAILED. */
+export interface FieldError {
+  /** JSON Pointer to the field or query parameter, for example `/email`. */
+  field: string;
+  /** Translatable reason, for example `UNKNOWN_FIELD`. */
+  code: string;
+}
+
 export interface Problem {
   type: string;
   title: string;
@@ -37,6 +45,7 @@ export interface Problem {
   code: ErrorCode;
   detail?: string;
   requestId: string;
+  errors?: FieldError[];
 }
 
 /**
@@ -48,6 +57,7 @@ export class ProblemException extends Error {
     readonly status: number,
     readonly errorCode: ErrorCode,
     readonly detail?: string,
+    readonly errors?: readonly FieldError[],
   ) {
     super(detail ?? TITLES[errorCode]);
     this.name = 'ProblemException';
@@ -59,6 +69,7 @@ export function buildProblem(
   code: ErrorCode,
   requestId: string,
   detail?: string,
+  errors?: readonly FieldError[],
 ): Problem {
   return {
     type: `${PROBLEM_TYPE_BASE}${code}`,
@@ -67,5 +78,6 @@ export function buildProblem(
     code,
     ...(detail === undefined ? {} : { detail }),
     requestId,
+    ...(errors === undefined ? {} : { errors: [...errors] }),
   };
 }

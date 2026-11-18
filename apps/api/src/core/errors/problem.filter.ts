@@ -2,12 +2,19 @@ import { Catch, HttpException, type ArgumentsHost, type ExceptionFilter } from '
 import type { Request, Response } from 'express';
 import { JSON_BODY_LIMIT_BYTES } from '../http/request-limits.js';
 import { REQUEST_ID_HEADER } from '../logging/request-id.js';
-import { buildProblem, ProblemException, PROBLEM_CONTENT_TYPE, type ErrorCode } from './problem.js';
+import {
+  buildProblem,
+  ProblemException,
+  PROBLEM_CONTENT_TYPE,
+  type ErrorCode,
+  type FieldError,
+} from './problem.js';
 
 interface ProblemParts {
   status: number;
   code: ErrorCode;
   detail?: string;
+  errors?: readonly FieldError[];
 }
 
 // Codes for errors raised by the framework itself rather than by FeenGo code, such as
@@ -33,6 +40,7 @@ function toProblemParts(exception: unknown): ProblemParts {
       status: exception.status,
       code: exception.errorCode,
       ...(exception.detail === undefined ? {} : { detail: exception.detail }),
+      ...(exception.errors === undefined ? {} : { errors: exception.errors }),
     };
   }
   if (exception instanceof HttpException) {
@@ -67,7 +75,7 @@ export class ProblemFilter implements ExceptionFilter {
     const http = host.switchToHttp();
     const req = http.getRequest<Request>();
     const res = http.getResponse<Response>();
-    const { status, code, detail } = toProblemParts(exception);
+    const { status, code, detail, errors } = toProblemParts(exception);
 
     // Read by the request log line (section 4.5): `errorCode` on every failure, and
     // the error itself for server faults.
@@ -86,6 +94,6 @@ export class ProblemFilter implements ExceptionFilter {
     res
       .status(status)
       .type(PROBLEM_CONTENT_TYPE)
-      .send(JSON.stringify(buildProblem(status, code, requestId, detail)));
+      .send(JSON.stringify(buildProblem(status, code, requestId, detail, errors)));
   }
 }

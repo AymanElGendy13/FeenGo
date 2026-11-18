@@ -19,19 +19,25 @@ export function createRedis(redisUrl: string, logger: Logger): Redis {
     maxRetriesPerRequest: 1,
     connectTimeout: 2_000,
   });
-  // Log changes of state, not every reconnect attempt.
-  let connected = true;
+  // Log changes of state, not every reconnect attempt. A Redis that was down from
+  // boot "could not connect"; only a connection that was made can be "lost".
+  let state: 'connecting' | 'up' | 'down' | 'unreachable' = 'connecting';
   redis.on('error', (err: unknown) => {
-    if (connected) {
-      connected = false;
+    if (state === 'connecting') {
+      state = 'unreachable';
+      logger.warn({ err }, 'redis could not connect');
+    } else if (state === 'up') {
+      state = 'down';
       logger.warn({ err }, 'redis connection lost');
     }
   });
   redis.on('ready', () => {
-    if (!connected) {
-      connected = true;
+    if (state === 'down') {
       logger.info('redis connection restored');
+    } else if (state === 'unreachable') {
+      logger.info('redis connected');
     }
+    state = 'up';
   });
   return redis;
 }

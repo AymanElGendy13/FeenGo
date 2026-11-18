@@ -4,10 +4,12 @@ import { createApp } from './app.factory.js';
 import { ConfigValidationError, loadConfig } from './core/index.js';
 
 // The repository's root .env, read if it exists (local development: copy
-// .env.example). Variables already set in the environment take precedence.
+// .env.example), and only when APP_ENV is unset or `local`: never in staging or
+// production. Variables already set in the environment take precedence.
 const LOCAL_ENV_FILE = fileURLToPath(new URL('../../../.env', import.meta.url));
+const appEnv = process.env.APP_ENV;
 
-if (existsSync(LOCAL_ENV_FILE)) {
+if ((appEnv === undefined || appEnv === 'local') && existsSync(LOCAL_ENV_FILE)) {
   process.loadEnvFile(LOCAL_ENV_FILE);
 }
 

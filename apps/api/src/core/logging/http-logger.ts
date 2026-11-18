@@ -66,12 +66,29 @@ function isMadeUpError(error: Error, res: ServerResponse): boolean {
   );
 }
 
+/**
+ * Sends every Error at the top level of a log object through the error serializer,
+ * whatever its key (`error`, `cause` and so on), not only `err`. pino runs this
+ * before its serializers and redaction; `err` is left to its serializer.
+ */
+function serializeTopLevelErrors(object: Record<string, unknown>): Record<string, unknown> {
+  let result = object;
+  for (const [key, value] of Object.entries(object)) {
+    if (key !== 'err' && value instanceof Error) {
+      result = result === object ? { ...object } : result;
+      result[key] = serializeError(value);
+    }
+  }
+  return result;
+}
+
 export function loggerOptions(config: Pick<AppConfig, 'appEnv' | 'logLevel'>): LoggerOptions {
   return {
     level: config.logLevel,
     timestamp: stdTimeFunctions.isoTime,
     redact: { paths: [...REDACT_PATHS], censor: REDACTED },
     serializers: { err: serializeError },
+    formatters: { log: serializeTopLevelErrors },
     // Readable local logs only; every other environment writes JSON lines.
     ...(config.appEnv === 'local'
       ? { transport: { target: 'pino-pretty', options: { singleLine: true } } }
