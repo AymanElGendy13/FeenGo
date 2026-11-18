@@ -49,7 +49,30 @@ function boundaryRule(depth) {
   };
 }
 
+// The migrator and the migrations run from source with Node's type stripping, which
+// resolves import paths exactly as written, so they import packages only, never
+// another source file (see the note at the top of src/database/migrator.ts). Listed
+// after the boundary rules, so for these files this stricter rule replaces them.
+const packagesOnlyRule = {
+  files: ['src/database/migrator.ts', 'src/database/migrations/**/*.ts'],
+  rules: {
+    'no-restricted-imports': [
+      'error',
+      {
+        patterns: [
+          {
+            regex: '^\\.{1,2}(/|$)',
+            message:
+              'The migrator and migrations import packages only: Node runs them from source and cannot resolve relative imports to .ts files.',
+          },
+        ],
+      },
+    ],
+  },
+};
+
 export default defineConfig([
   rootConfig,
   ...Array.from({ length: maxDepth + 1 }, (_unused, depth) => boundaryRule(depth)),
+  packagesOnlyRule,
 ]);

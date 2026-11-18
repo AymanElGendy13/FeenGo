@@ -1,16 +1,46 @@
+import type { FactoryProvider } from '@nestjs/common';
 import { Kysely, PostgresDialect } from 'kysely';
 import pg from 'pg';
 import type { Logger } from 'pino';
+import type { DB } from '../../database/index.js';
 
 /**
- * The database schema as Kysely sees it. Empty until C4 adds the first migration and
- * the types generated from it (docs/ARCHITECTURE.md section 5.1).
+ * Every table as Kysely sees it, generated from the migrated database by
+ * `pnpm db:types` into src/database/schema.generated.ts (section 5.1).
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- tables arrive in C4
-export interface Database {}
+export type Database = DB;
 
-/** Injection token for the shared `Kysely<Database>` instance. */
+/**
+ * Injection token for the shared `Kysely<Database>` instance. Internal to core:
+ * feature modules get their own narrowed view through `moduleDatabaseProvider`.
+ */
 export const DATABASE = Symbol('DATABASE');
+
+/**
+ * A module's view of the database: only the tables it owns (section 4.2), so a
+ * query on another module's table does not compile. The narrowing covers Kysely's
+ * query builder; raw `sql` is not checked against it.
+ */
+export type ModuleDatabase<Tables extends keyof Database> = Kysely<Pick<Database, Tables>>;
+
+/**
+ * Provides the shared Kysely instance under a module's own token, typed with only
+ * that module's tables. It is the same object and the same pool at run time:
+ *
+ *   export const SETTINGS_DATABASE = Symbol('SETTINGS_DATABASE');
+ *   providers: [moduleDatabaseProvider<'settings' | 'setting_definitions'>(SETTINGS_DATABASE)]
+ *   constructor(@Inject(SETTINGS_DATABASE) db: ModuleDatabase<'settings' | ...>)
+ */
+export function moduleDatabaseProvider<Tables extends keyof Database>(
+  token: symbol,
+): FactoryProvider<ModuleDatabase<Tables>> {
+  return {
+    provide: token,
+    inject: [DATABASE],
+    // Only the type narrows; Kysely<Database> is not assignable to a Kysely of fewer tables.
+    useFactory: (db: Kysely<Database>) => db as unknown as ModuleDatabase<Tables>,
+  };
+}
 
 /**
  * Kysely over a `pg` pool, connected as the `feengo_app` role through DATABASE_URL

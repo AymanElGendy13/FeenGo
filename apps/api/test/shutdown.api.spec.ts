@@ -2,7 +2,8 @@ import type { Redis } from 'ioredis';
 import type { Kysely } from 'kysely';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
-import { DATABASE, REDIS, type Database } from '../src/core/index.js';
+import { DATABASE, type Database } from '../src/core/database/database.js';
+import { REDIS } from '../src/core/index.js';
 import { createTestApp } from './support/app.js';
 
 describe('shutdown', () => {

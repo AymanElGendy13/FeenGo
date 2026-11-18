@@ -13,8 +13,8 @@ export type CoreOptions = ConfigOptions & LoggingOptions;
 
 /**
  * Configuration, logging, the database and Redis clients and the Problem filter
- * (section 4.2). Global, so feature modules inject DATABASE and REDIS without
- * importing it.
+ * (section 4.2). Global, so feature modules inject REDIS, and their own narrowed
+ * database through `moduleDatabaseProvider`, without importing it.
  */
 @Global()
 @Module({})
