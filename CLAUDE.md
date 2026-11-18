@@ -42,7 +42,18 @@ Each feature in a slice goes through architect, then ui-ux-designer, then builde
 - Deliver work as small, single-feature pull requests. Each feature pull request is reviewed and merged before the next one starts. Design specs and documents for the next slice may be prepared alongside.
 - Plan before editing. For anything bigger than a small fix, present a plan and wait for approval.
 - Work on a branch named `<slice>/<requirement-id>-<short-name>`, for example `s1/c-02-otp-login`. Never commit to `main`.
-- Every change reaches `main` through a pull request, after tests pass, the reviewer subagent approves, and the owner approves.
+- Every change reaches `main` through a pull request, after tests pass and the reviewer subagent approves. Who merges depends on the kind of change:
+
+  | Kind of pull request | Who merges |
+  | --- | --- |
+  | Documents (`docs/**`, `CLAUDE.md`, `.claude/**`); any decision; the API contract; any migration or data-model change; any dependency change (an edit to dependency fields in `package.json` or `pubspec.yaml`, or to `pnpm-lock.yaml` or `pubspec.lock`); sign-in and security code (see below); anything under `.github/**` or anything else that decides which checks run; anything released to testers or stores | The owner |
+  | A build increment that only implements what is already approved and falls under no row above | The main Claude session, when every auto-merge condition below holds |
+
+  Sign-in and security code means: the API's auth module, guards and role checks, token signing and refresh, one-time code sending and limits, rate limiting, log redaction, cookie and session handling in both dashboards, and secure storage in the app. In S1 nearly every pull request is sign-in code, so nearly every S1 pull request goes to the owner.
+
+  Auto-merge conditions, all required: CI is green, and branch protection on `main` requires it and is enforced for administrators; the reviewer subagent approves with no open findings and marks the pull request "auto-merge eligible"; qa-tester passes; and the pull request falls under no row the owner merges. The main session merges with the GitHub merge tool only, never overrides a failing check, never bypasses branch protection, and posts a short summary on the pull request for the owner. If any condition fails, or there is any doubt, the pull request waits for the owner. No subagent merges. The owner can revert any auto-merged pull request.
+
+  Auto-merge starts only after CI exists (S0 increment C3) and the owner has turned on required status checks for `main`, enforced for administrators. Until then, the owner merges everything.
 - Change `docs/api/openapi.yaml` before the code that uses it.
 - Each folder under `apps/` has one owning subagent. Two subagents never edit the same files at the same time.
 - Record every significant decision in `docs/DECISIONS.md`.

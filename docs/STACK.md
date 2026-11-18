@@ -57,6 +57,6 @@ No change is merged unless all of these pass:
 - Unit tests for business rules, such as slot holds, cancellation windows and deposits.
 - API tests against the contract.
 - End-to-end tests of the main journeys the change touches, on the app and the dashboards. A slice is only done when all of its main journeys pass (see `docs/ROADMAP.md`).
-- A review by the reviewer agent, then the owner's approval.
+- A review by the reviewer agent, then a merge under the rule in `CLAUDE.md`.
 
 Before the first public release, add a load test at 10 times expected launch traffic and a full manual pass in Arabic and English on real phones.

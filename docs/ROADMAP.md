@@ -58,7 +58,7 @@ Typeface: IBM Plex Sans Arabic for Arabic and English.
 1. Its screens are designed and approved in Arabic and English.
 2. It works in every product it touches.
 3. Tests pass for all of its acceptance checks.
-4. The reviewer agent has checked it, and the owner has approved the merge.
+4. The reviewer agent has checked every pull request in it, and each was merged under the rule in `CLAUDE.md`.
 5. It is released to testers through TestFlight and Google Play internal testing, and the dashboards are deployed to staging (from S1, once the host is chosen).
 6. The owner has used it on a real phone.
 
