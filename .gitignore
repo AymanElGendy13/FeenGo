@@ -12,6 +12,8 @@ GoogleService-Info.plist
 # Dependencies and builds
 node_modules/
 dist/
+# The design tokens' generated outputs are committed (ARCHITECTURE section 13).
+!packages/design-tokens/dist/
 .next/
 build/
 coverage/
