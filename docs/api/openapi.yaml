@@ -149,6 +149,9 @@ paths:
           $ref: '#/components/responses/UnexpectedError'
 
   /v1/auth/otp/request:
+    parameters:
+      - $ref: '#/components/parameters/XFeenGoClientIp'
+      - $ref: '#/components/parameters/XFeenGoForwardingKey'
     post:
       tags: [auth]
       operationId: requestOtp
@@ -248,7 +251,9 @@ paths:
         '503':
           description: |
             `OTP_DELIVERY_FAILED`: both WhatsApp and SMS refused the message. Nothing counts
-            against the customer's limits, and they can try again.
+            against the customer's limits: the resend cooldown and this request's rate-limit
+            counts are taken back, and any earlier code for the phone still works. The customer
+            can try again at once.
           headers:
             X-Request-Id:
               $ref: '#/components/headers/X-Request-Id'
@@ -260,6 +265,9 @@ paths:
           $ref: '#/components/responses/UnexpectedError'
 
   /v1/auth/otp/verify:
+    parameters:
+      - $ref: '#/components/parameters/XFeenGoClientIp'
+      - $ref: '#/components/parameters/XFeenGoForwardingKey'
     post:
       tags: [auth]
       operationId: verifyOtp
@@ -269,10 +277,11 @@ paths:
         is new (sign-up and sign-in are the same step), registers or updates the device, and
         returns an access token and a refresh token.
 
-        Each wrong code counts against the phone number, across all of its challenges. When the
-        count reaches the `auth.otp.max_wrong_attempts` setting (default 5), sign-in for that
-        phone is locked for the `auth.otp.lock_minutes` setting (default 15) and the challenge
-        ends. A correct code resets the count.
+        Each attempt is counted before the code is compared, against the phone number across
+        all of its challenges and against the challenge itself, so parallel guesses cannot get
+        more tries. When the count reaches the `auth.otp.max_wrong_attempts` setting
+        (default 5), sign-in for that phone is locked for the `auth.otp.lock_minutes` setting
+        (default 15) and the challenge ends. A correct code resets the phone's count.
 
         The `installationId` must be the one that requested the code.
       security: []
@@ -370,6 +379,9 @@ paths:
           $ref: '#/components/responses/UnexpectedError'
 
   /v1/auth/refresh:
+    parameters:
+      - $ref: '#/components/parameters/XFeenGoClientIp'
+      - $ref: '#/components/parameters/XFeenGoForwardingKey'
     post:
       tags: [auth]
       operationId: refreshSession
@@ -437,6 +449,9 @@ paths:
           $ref: '#/components/responses/UnexpectedError'
 
   /v1/auth/logout:
+    parameters:
+      - $ref: '#/components/parameters/XFeenGoClientIp'
+      - $ref: '#/components/parameters/XFeenGoForwardingKey'
     post:
       tags: [auth]
       operationId: logout
@@ -462,6 +477,9 @@ paths:
           $ref: '#/components/responses/UnexpectedError'
 
   /v1/me:
+    parameters:
+      - $ref: '#/components/parameters/XFeenGoClientIp'
+      - $ref: '#/components/parameters/XFeenGoForwardingKey'
     get:
       tags: [me]
       operationId: getMyProfile
@@ -576,6 +594,9 @@ paths:
           $ref: '#/components/responses/UnexpectedError'
 
   /v1/admin/auth/sign-in:
+    parameters:
+      - $ref: '#/components/parameters/XFeenGoClientIp'
+      - $ref: '#/components/parameters/XFeenGoForwardingKey'
     post:
       tags: [admin-auth]
       operationId: adminSignIn
@@ -635,6 +656,9 @@ paths:
           $ref: '#/components/responses/UnexpectedError'
 
   /v1/admin/auth/totp/verify:
+    parameters:
+      - $ref: '#/components/parameters/XFeenGoClientIp'
+      - $ref: '#/components/parameters/XFeenGoForwardingKey'
     post:
       tags: [admin-auth]
       operationId: adminVerifyTotp
@@ -700,6 +724,9 @@ paths:
           $ref: '#/components/responses/UnexpectedError'
 
   /v1/admin/me:
+    parameters:
+      - $ref: '#/components/parameters/XFeenGoClientIp'
+      - $ref: '#/components/parameters/XFeenGoForwardingKey'
     get:
       tags: [admin]
       operationId: getAdminMe
@@ -728,6 +755,9 @@ paths:
           $ref: '#/components/responses/UnexpectedError'
 
   /v1/admin/activity-log:
+    parameters:
+      - $ref: '#/components/parameters/XFeenGoClientIp'
+      - $ref: '#/components/parameters/XFeenGoForwardingKey'
     get:
       tags: [admin]
       operationId: listAdminActivity
@@ -811,6 +841,31 @@ paths:
           $ref: '#/components/responses/UnexpectedError'
 
 components:
+  parameters:
+    XFeenGoClientIp:
+      name: X-FeenGo-Client-IP
+      in: header
+      required: false
+      description: |
+        Sent only by the FeenGo website servers: the browser's IP address, taken from the
+        website host's trusted proxy hops. The API uses it for rate limits only when
+        `X-FeenGo-Forwarding-Key` is valid, and ignores it otherwise. The website servers strip
+        any copy a browser sends. The app never sends it.
+      schema:
+        type: string
+        maxLength: 45
+    XFeenGoForwardingKey:
+      name: X-FeenGo-Forwarding-Key
+      in: header
+      required: false
+      description: |
+        Sent only by the FeenGo website servers: a secret shared with the API, one per website,
+        that makes `X-FeenGo-Client-IP` trusted. Never logged. The app never sends it.
+      schema:
+        type: string
+        minLength: 32
+        maxLength: 128
+
   securitySchemes:
     bearerAuth:
       type: http

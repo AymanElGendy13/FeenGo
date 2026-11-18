@@ -197,6 +197,7 @@ In order, for every request:
 
 - **Bodies are never logged**, neither requests nor responses. A request log line holds the method, the route pattern (not the raw URL), the status, the duration, the request ID and the caller's subject ID.
 - **Redaction** applies to anything else that reaches a log, with pino's redaction paths, including one-level wildcards: `req.headers.authorization`, `req.headers.cookie`, `req.headers["x-feengo-forwarding-key"]`, `res.headers["set-cookie"]`, `*.password`, `*.code`, `*.accessToken`, `*.refreshToken`, `*.tokens`, `*.mfaToken`, `*.otpauth`, `*.secret`, `*.name`, `*.email`, `*.phone`, `*.to`, `*.phone_e164` and the top-level keys of the same names, such as `phone_e164`. Where a phone must be identified for support, the log carries only its last 3 digits.
+- **Errors are logged under names the wildcards do not touch.** `*.code` and `*.name` would otherwise blank `err.code`, `err.name` and problem codes. The error serializer writes `err: { errorType, errorCode, message, stack }`: `errorType` from the error's class name, `errorCode` from the error's or the Problem's code. It drops database error fields that can hold row values (`detail`, `where`, `parameters`). Request log lines carry a failed request's Problem code as `errorCode` too. A test, `Q-05 error codes survive redaction`, checks that `errorCode` and `errorType` appear while a planted `name` and `code` do not.
 - **Outbound calls to providers are never logged** (WhatsApp, SMS, and later Paymob and Firebase). Their HTTP clients have request and response logging switched off; the code logs only the provider name, the outcome, the provider's message ID and the duration.
 - **The websites follow the same rules.** Their server code logs through one small wrapper that accepts only named, allowed fields; it never logs bodies, cookies or tokens.
 - **Test, written in C2 and extended in S1:** `Q-05 logs never contain a known code, token or phone number`. It captures every log line during a request-code, verify, refresh and profile run with a fixed fake code, and fails if the code, either token or the phone number appears. S1 adds the same test for the admin website's sign-in route handlers.
@@ -204,7 +205,7 @@ In order, for every request:
 ### 4.6 Client IP and the website servers
 
 - Behind the host's load balancer, the API takes the client IP from `X-Forwarded-For`, trusting only the number of proxy hops set in `TRUST_PROXY`.
-- Calls from the website servers would otherwise all come from one IP. Each website server therefore sends the browser's IP in `X-FeenGo-Client-IP` together with `X-FeenGo-Forwarding-Key`, a secret shared only with the API (`BFF_FORWARDING_KEYS`, one key per website). The API uses `X-FeenGo-Client-IP` only when the key matches (compared in constant time) and ignores it otherwise.
+- Calls from the website servers would otherwise all come from one IP. Each website server therefore sends the browser's IP in `X-FeenGo-Client-IP` together with `X-FeenGo-Forwarding-Key`, a secret shared only with the API (`BFF_FORWARDING_KEYS`, one key per website). The API uses `X-FeenGo-Client-IP` only when the key matches (compared in constant time) and ignores it otherwise. Both headers are declared in the contract. The website server takes the browser's IP only from its own host proxy's trusted hops, and strips any client-supplied copies of these headers (section 8.3).
 - **Per-IP limits are high ceilings against abuse, not everyday limits.** Many Egyptian mobile customers share one carrier IP address, so the everyday limits are per phone, per device, per email or per session (sections 7 and 8), and the per-IP numbers in the contract are set well above what a busy carrier address sends.
 - Health probes are not limited per IP in practice: their ceilings in the contract are far above what probes send, and readiness results are cached for 1 second so a flood never reaches the database.
 
@@ -312,9 +313,9 @@ The one place where admin sign-in failures and locks are kept, for known and unk
 | `fallback_used` | boolean | not null, default false |
 | `provider` | text | not null, for example `fake`, `whatsapp-cloud` |
 | `provider_message_id` | text, null | the provider's ID, for support and, once a vendor is chosen, delivery receipts |
-| `delivery_status` | text | not null, `CHECK (delivery_status IN ('queued','sent','delivered','failed'))` |
+| `delivery_status` | text | not null, `CHECK (delivery_status IN ('queued','sent','delivered','failed'))`; `failed` when both channels refused |
 | `language` | text | not null, `CHECK (language IN ('en','ar'))` |
-| `wrong_attempts` | smallint | not null, default 0, `CHECK (wrong_attempts >= 0)`; a per-challenge cap that still holds if Redis loses data (section 7.5) |
+| `attempt_count` | smallint | not null, default 0, `CHECK (attempt_count >= 0)`; comparisons reserved before each check, a per-challenge cap that still holds if Redis loses data (section 7.5) |
 | `expires_at` | timestamptz | not null; `created_at` plus the `auth.otp.code_ttl_seconds` setting at creation |
 | `consumed_at` | timestamptz, null | set on success, or when a newer code replaces it, or on lock |
 | `created_at` | timestamptz | not null |
@@ -481,7 +482,7 @@ Why this rather than the bundled `cube` and `earthdistance` extensions: at launc
 ### 7.1 Flow
 
 1. The app sends `POST /v1/auth/otp/request` with the phone, its installation ID and the chosen language.
-2. The API checks the phone format and country, the lock, the cooldown and the rate limits. It ends any open challenge for that phone, makes a 6-digit code with a secure random generator, stores its HMAC, and asks `OtpSender` to send it.
+2. The API checks the phone format and country, the lock, the cooldown and the rate limits. It makes a 6-digit code with a secure random generator, stores a new challenge with the code's HMAC, and asks `OtpSender` to send it. Only after a channel accepts the message are the phone's earlier open challenges ended, so a failed send never takes away a code the customer already has.
 3. `OtpSender` tries WhatsApp first. **In S1 the fallback is synchronous only:** if WhatsApp refuses the message during the request, `OtpSender` sends the same code by SMS within the same request. The code is still in memory at that moment; it is never kept after the request ends. The response says which channel was used.
 4. If WhatsApp accepted the message but the customer never receives it, the app offers "send by SMS instead" once the resend cooldown has passed. That is a new request with `channel: sms`, which makes a **new** code, replaces the stored hash and ends the earlier challenge.
 5. The app sends `POST /v1/auth/otp/verify` with the code and its device details. On success: customer created if new, device upserted, session started, tokens returned. On a wrong code: the counter goes up, and at the limit the phone is locked and the challenge ends (section 7.5).
@@ -527,10 +528,11 @@ Every counter and every "only once" rule is a single atomic operation. Where eac
 | --- | --- | --- |
 | Wrong codes per phone (C-02's five tries) | Redis `otp:fail:{hmac(phone)}`, window = `auth.otp.lock_minutes` from the first wrong code | One Lua script, run **before** the code is compared: if `otp:lock:{hmac}` exists, return locked; otherwise `INCR` the counter (setting its expiry on the first increment); if the result is above `auth.otp.max_wrong_attempts`, set the lock and return locked. Only then is the code compared. A correct code deletes the counter. Because the attempt is counted before comparing, parallel guesses can never get more than the allowed number of comparisons. |
 | The lock | Redis `otp:lock:{hmac(phone)}` with expiry `auth.otp.lock_minutes` | Set when a wrong code is the one that reached the limit (that request answers `423 OTP_LOCKED`), and by the script itself for any parallel attempt counted beyond the limit |
-| Wrong codes per challenge | Postgres `otp_challenges.wrong_attempts` | `UPDATE otp_challenges SET wrong_attempts = wrong_attempts + 1 WHERE id = $1 AND wrong_attempts < $max RETURNING wrong_attempts`; no row returned means the challenge is used up. A second cap that does not depend on Redis. |
+| Attempts per challenge | Postgres `otp_challenges.attempt_count` | Reserved **before** the code is compared, right after the Redis script: `UPDATE otp_challenges SET attempt_count = attempt_count + 1 WHERE id = $1 AND attempt_count < $max AND consumed_at IS NULL RETURNING attempt_count`. No row returned: the challenge is used up, so the API ends it, sets the Redis lock again and answers `423 OTP_LOCKED`. On a correct code the reservation is simply left in place, because the challenge is consumed anyway. A second cap that does not depend on Redis, and that parallel guesses cannot exceed. |
 | A code works once | Postgres `otp_challenges.consumed_at` | `UPDATE otp_challenges SET consumed_at = now() WHERE id = $1 AND consumed_at IS NULL AND expires_at > now() RETURNING id`, run only after the code matched. No row returned: the API reads the row once more to answer `409 OTP_ALREADY_USED` or `410 OTP_EXPIRED`. |
-| One code at a time per phone | Redis `otp:cooldown:{hmac(phone)}` | `SET ... NX EX <auth.otp.resend_cooldown_seconds>`. Only one of two parallel requests gets through; the other gets `429 OTP_RESEND_TOO_SOON`. In the same database transaction as the insert, the previous open challenge is ended (`UPDATE ... SET consumed_at = now() WHERE phone_e164 = $1 AND consumed_at IS NULL`). |
+| One code at a time per phone | Redis `otp:cooldown:{hmac(phone)}` | `SET ... NX EX <auth.otp.resend_cooldown_seconds>`. Only one of two parallel requests gets through; the other gets `429 OTP_RESEND_TOO_SOON`. After a channel accepts the message, one statement ends the earlier open challenges: `UPDATE ... SET consumed_at = now() WHERE phone_e164 = $1 AND consumed_at IS NULL AND id <> $new`. |
 | Requests per phone and per device | Redis `rl:otp:phone:...`, `rl:otp:device:...`, one hour | The rate limiter's script (section 7.4) |
+| Nothing counts when both channels fail | Redis cooldown and counters, Postgres challenge | When WhatsApp and SMS both refuse (`503 OTP_DELIVERY_FAILED`), the API marks the new challenge `failed` and consumed, deletes `otp:cooldown:{hmac}`, and takes back this request's increments of the per-phone, per-device and per-IP counters with one Lua script (decrement only if the key still exists and is above zero). The contract promises that nothing counts against the customer, and the earlier challenge is still open. |
 | One customer per phone | Postgres `customers` partial unique index | `INSERT INTO customers (phone_e164, language) VALUES ($1, $2) ON CONFLICT (phone_e164) WHERE phone_e164 IS NOT NULL DO UPDATE SET last_signed_in_at = now() RETURNING id, (xmax = 0) AS inserted`. Two first sign-ins at the same moment give one customer; `inserted` says whether it is new. |
 | One device row per installation | Postgres `devices` unique `(customer_id, installation_id)` | `INSERT ... ON CONFLICT (customer_id, installation_id) DO UPDATE SET last_seen_at = now(), app_version = EXCLUDED.app_version` |
 | Admin sign-in failures | Postgres `admin_sign_in_attempts` | Single-statement upsert (section 5.3) |
@@ -538,7 +540,7 @@ Every counter and every "only once" rule is a single atomic operation. Where eac
 **If Redis loses data** (a restart that loses the last second of writes, a failover, or a flush):
 
 - Code expiry and single use still hold, because they are in Postgres.
-- Each challenge still allows at most `auth.otp.max_wrong_attempts` wrong codes, because of the Postgres cap. A guesser therefore gets at most five tries per one-in-a-million code.
+- Each challenge still allows at most `auth.otp.max_wrong_attempts` comparisons, because the Postgres reservation is made before each comparison, even for parallel guesses. A guesser therefore gets at most five tries per one-in-a-million code.
 - What is lost: the per-phone lock and counter across challenges, cooldowns and hourly limits. They start again from zero, and the per-challenge cap bounds the damage. Admin locks are not affected, because they are in Postgres.
 - Also lost: the access-token deny-list (an ended session's access token works until it expires, at most 15 minutes; its refresh tokens are already revoked in Postgres), refresh successors cached for the grace period (section 8.1), and admin `mfaToken`s (the admin starts sign-in again).
 - **If Redis cannot be reached at all**, the code request, code check, admin sign-in and refresh endpoints answer `503 SERVICE_UNAVAILABLE`. They never skip their limits.
@@ -551,7 +553,8 @@ Every counter and every "only once" rule is a single atomic operation. Where eac
 - `C-02 two parallel code requests for one phone send one code`
 - `C-02 a new code ends the previous challenge`
 - `C-02 two parallel first sign-ins for a new phone create one customer`
-- `C-02 a challenge allows at most five wrong codes after Redis is flushed`
+- `C-02 parallel guesses at one challenge after Redis is flushed get at most five comparisons` (20 guesses sent at once, after `FLUSHALL`)
+- `C-02 a code request that both channels refuse leaves no cooldown and no count, and the earlier code still works`
 - `C-02 code request and check answer 503 when Redis is down`
 
 ## 8. Sessions and tokens
@@ -562,12 +565,12 @@ Every counter and every "only once" rule is a single atomic operation. Where eac
 - **Refresh token**: 256 random bits, base64url, prefixed `frt_` so secret scanners can spot leaks. Only its SHA-256 hash is stored. Single use: every refresh returns a new one and marks the old one used (rotation). Replaying a used token after `REFRESH_REUSE_GRACE_SECONDS` (10) ends the whole session (theft detection).
 - **Rotation, the grace period, and one branch only.** A session's tokens always form a single chain; a token never gets a second successor.
   1. Rotation is one statement inside a transaction: `UPDATE refresh_tokens SET used_at = now(), replaced_by_id = $new WHERE token_hash = $1 AND used_at IS NULL AND revoked_at IS NULL AND expires_at > now() RETURNING ...`. The row lock means that of two parallel refreshes with the same token, one rotates and the other waits.
-  2. Before committing, the winner stores the successor in Redis under `rt:succ:{sha256(old token)}` for the grace period, encrypted with AES-256-GCM under a key derived (HKDF) from the **old token itself**, not from its stored hash. Only someone holding the old token can decrypt it; the database and Redis together are not enough.
+  2. Before committing, the winner stores the successor in Redis under `rt:succ:{sha256(old token)}` for the grace period, encrypted with AES-256-GCM under a key derived (HKDF) from the **old token itself**, not from its stored hash. Only someone holding the old token can decrypt it; the database and Redis together are not enough. If the transaction then rolls back or the commit fails, the API deletes that cache entry before answering, so no cached successor exists without its database row. If even that delete fails, the entry expires within the grace period, and its token is unusable anyway because it has no database row.
   3. A request with an already used token, inside the grace period, gets the **same** successor from that cache, with a newly signed access token. No new refresh token is made.
   4. Inside the grace period but with the cache missing (Redis lost it), the API answers `401 REFRESH_TOKEN_INVALID` and makes nothing new. The session is not ended, but this client has to sign in again.
   5. After the grace period, a used token gets `401 REFRESH_TOKEN_REUSED` and the whole session is revoked.
 - **Refresh is rate-limited per session** (30 an hour, `REFRESH_RATE_PER_SESSION_PER_HOUR`), with only a high per-IP ceiling, because admin traffic arrives through the website servers and many customers share carrier addresses.
-- **Tests:** `C-02 a refresh retried within the grace period returns the same successor`, `C-02 two parallel refreshes with one token create one successor`, `C-02 a used refresh token replayed after the grace period ends the session`, `C-02 a refresh replayed within the grace period with the cache lost creates no second branch`, `C-02 refresh is limited per session`.
+- **Tests:** `C-02 a refresh retried within the grace period returns the same successor`, `C-02 two parallel refreshes with one token create one successor`, `C-02 a used refresh token replayed after the grace period ends the session`, `C-02 a refresh replayed within the grace period with the cache lost creates no second branch`, `C-02 a rotation that rolls back leaves no cached successor`, `C-02 refresh is limited per session`.
 - **Revocation before expiry.** Logout, deletion, suspension and admin disabling add the session ID to a Redis deny-list (`sid:revoked:{sid}`) that lives as long as an access token. The guard checks it on every request. This is shared state in Redis, not server memory, so the API stays stateless.
 
 | | Customers (app) | Admins (back office) |
@@ -600,12 +603,25 @@ The browser only talks to its own Next.js server; only that server calls the API
 - Within one website server, refreshes are single-flight: parallel requests with the same refresh cookie share one call to the API. Across several website containers, two parallel refreshes are still safe, because the API returns the same successor within the grace period (section 8.1), so the session never splits.
 - If refresh fails, `proxy.ts` deletes the session cookies and sends the browser to the sign-in page.
 
-**Every admin page checks the session itself**
+**Three layers check the session; the API is the final authority**
 
-- The proxy is a convenience, not the security boundary. The root layout of the signed-in part of the back office calls `GET /v1/admin/me` with the access token on **every** request, and redirects to the sign-in page if that call does not succeed. The API is the authority: it checks the signature, expiry, deny-list and the second sign-in step. Admin traffic is small, so one extra call per page is cheap.
+A check in a shared layout is **not** enough: when the user navigates inside the app, Next.js fetches only the changed page segment (a React Server Components request) and does not run the shared layouts again, so a layout check can be skipped. The design therefore checks in places that run on every request:
+
+1. **`proxy.ts` verifies the access token on every request**, including React Server Components navigation requests (`RSC: 1`), prefetches and server action posts. Its matcher excludes only static files (`/_next/static`, `/_next/image`, fonts, `favicon.ico`). It verifies the JWT itself with `jose`: the signature against the API's public keys (`JWT_VERIFY_KEYS`, public keys only, never the signing keys), the expiry, `iss`, `aud = feengo-admin`, `typ = admin`, and `amr` containing `otp`. Any failure, after one refresh attempt, deletes the session cookies and redirects to the sign-in page (for an RSC request, the redirect response Next.js expects). Paths that do not need a session (`/sign-in`, `/session/password`, `/session/totp`) are the only exceptions, listed explicitly.
+2. **`requireAdmin()`**, one shared server-only function in admin-web, is called at the top of **every** admin page, every server action and every route handler that serves signed-in users, not in a layout. It repeats the same JWT checks, so a page is safe even if the proxy were skipped (Next.js has had bugs that let requests bypass its middleware). On pages it also calls `GET /v1/admin/me`, which adds the API's own checks, including the deny-list of ended sessions, and returns the admin shown in the header. If either check fails it redirects to sign-in; in server actions and route handlers it answers 401.
+3. **The API** checks every call itself: signature, expiry, deny-list, role and the second sign-in step. Pages get their data only through the API, so even a page that rendered by mistake would have no admin data to show.
+
+If the owner refuses `GET /v1/admin/me` (question 15), nothing else changes: `requireAdmin()` relies on its local JWT check, the admin's name comes from the token's claims, and a session ended less than 15 minutes ago can at most render an empty page frame, because every data call to the API is refused.
+
 - Server actions and route handlers that change data send the access token to the API, which checks it again.
 - CSRF: `SameSite=Strict`, plus a check of the `Origin` header on every state-changing route handler (Next.js server actions already check it).
-- **Tests:** `A-01 a forged session cookie never renders an admin page` (a token signed with another key, an altered token and random bytes, each in `__Host-feengo_at`, must lead to the sign-in page with no admin content in the response), `A-01 the password step alone never renders an admin page` (only the `mfa` cookie set), and `A-01 an ended session never renders an admin page`.
+- **Header hygiene.** `proxy.ts` deletes any incoming `X-FeenGo-Client-IP`, `X-FeenGo-Forwarding-Key` and `X-FeenGo-Internal-Access-Token` (the internal header that carries a freshly refreshed token to the page render) before setting its own values, so a browser can never supply them. The browser's IP is taken only from the hops of the website's own host proxy that are trusted (`TRUST_PROXY_HOPS`), never from a client-supplied `X-Forwarded-For` beyond them. Calls to the API are built in server code with headers set explicitly, never by copying incoming headers.
+- **Tests:**
+  - `A-01 a forged session cookie never renders an admin page`: a token signed with another key, an altered token, an expired token, a token with `aud = feengo-app`, a token without `otp` in `amr`, and random bytes, each in `__Host-feengo_at`. For each, a full page request, an **RSC navigation request** (`RSC: 1` with a router state header) to every admin route, a prefetch, and a server action post must give a redirect or 401 with no admin content.
+  - `A-01 the password step alone never renders an admin page` (only the `mfa` cookie set), again for page and RSC requests.
+  - `A-01 an ended session never renders an admin page`.
+  - `A-01 every admin page, server action and route handler calls requireAdmin`: a static test that fails if one does not.
+  - `A-01 client-supplied forwarding headers are ignored`.
 
 The partner dashboard (S2) uses the same pattern with its own cookies and `aud`.
 
@@ -736,8 +752,28 @@ apps/mobile/
 
 **The provisional palette and the contrast gate.** Primary `#B3204F` on the dark neutral `#1C2430` is 2.41 to 1, and success `#0E6B5E` on dark is 2.44 to 1, both below AA. Accent `#F2A93B` on the light neutral is 1.86 to 1. Used as they are, the C5 contrast check would fail, and design must not block the build. So:
 
-- **C5 ships temporary dark-theme values that pass AA.** In the dark theme, the roles that would use primary as text, outline or selected fill map to the light neutral `#FBF6EE` (14.52 to 1 on the dark neutral), with dark neutral on top of selected fills, and accent is used only for the dark focus ring (7.82 to 1). These are exactly the pairs in the designer's S0 placeholder spec (`docs/design/s0/placeholder-home.md`, colour and contrast tables, on pull request #2). Success and accent are not used for text in S0.
-- The light theme uses the provisional colours as they are: primary on the light neutral is 6.03 to 1 and white on primary is 6.49 to 1.
+- **C5 ships temporary dark-theme values that pass AA.** The roles and values below are the complete S0 colour set. C5 builds exactly these, so it does not depend on any other pull request. They match the designer's S0 placeholder spec (`docs/design/s0/placeholder-home.md`, on pull request #2, read 2026-11-18); if that spec changes before it merges, the designer updates both together.
+
+| Role | Light | Dark | Used for |
+| --- | --- | --- | --- |
+| `surface` | `#FBF6EE` | `#1C2430` | Screen background, unselected segments |
+| `onSurface` | `#1C2430` | `#FBF6EE` | Body text, titles, unselected labels |
+| `brandText` | `#B3204F` | `#FBF6EE` | App name |
+| `outline` | `#1C2430` | `#FBF6EE` | Control edges and dividers |
+| `selected` | `#B3204F` | `#FBF6EE` | Fill of a selected control |
+| `onSelected` | `#FFFFFF` | `#1C2430` | Label on a selected fill |
+| `focus` | `#B3204F` | `#F2A93B` | Focus ring, drawn outside the control with a 2 dp gap in `surface` |
+
+| Pair the contrast check tests | Light | Dark | Needed |
+| --- | --- | --- | --- |
+| `onSurface` on `surface` (text) | 14.52 | 14.52 | 4.5 |
+| `brandText` on `surface` (large text) | 6.03 | 14.52 | 3.0 (also meets 4.5) |
+| `onSelected` on `selected` (text) | 6.49 | 14.52 | 4.5 |
+| `selected` against `surface` (interface part) | 6.03 | 14.52 | 3.0 |
+| `outline` against `surface` (interface part) | 14.52 | 14.52 | 3.0 |
+| `focus` against `surface` (interface part) | 6.03 | 7.82 | 3.0 |
+
+  Success and accent are not used for text in S0; accent appears only as the dark focus ring. I recomputed every ratio above from the hex values with the WCAG formula.
 - The designer replaces the temporary dark values with real tints when the design system is approved: a single edit in `packages/design-tokens`, with the contrast check proving it.
 
 ## 14. Translations
@@ -820,7 +856,7 @@ All checked on **2026-11-18** from the sources the owner named: npm registry met
 | Node.js | 26.13.1 | 2026-11-10 | Active LTS ("Lithium"); maintenance LTS runs into 2029 | Current active LTS. Node 24 is in maintenance; 27 is not LTS. Image `node:26.13.1-alpine3.24`. |
 | pnpm | 12.21.0 | 2026-11-13 | Current major since 2026-08; pnpm 10 and 11 still get fixes | Latest stable, works on Node 26; pinned through `packageManager`, so the container's pnpm 10.28 switches to it |
 | TypeScript | 6.0.3 | 2026-04-16 | Microsoft; 7.0 (the native compiler) is out | **Not 7.0.2**: typescript-eslint 8.73 supports TypeScript below 6.1, and the NestJS 12 template uses `^6.0.2`. Move to 7 when the tools support it. |
-| PostgreSQL | 18.7 | image 2026-11-15 | Current major; 19 is in release candidate | Newest stable major. Image `postgres:18.7-alpine3.24`. Nothing in the schema needs 18-only features, so a host on 17 would also work. |
+| PostgreSQL | 18.7 | image 2026-11-15 | Current major; 19 is in release candidate | Newest stable major. Image `postgres:18.7-alpine3.24`. **Minimum on any host: PostgreSQL 15**, because the settings indexes use `NULLS NOT DISTINCT`. Nothing needs 18-only features, so a host on 15, 16 or 17 also works. |
 | Redis | 8.10.3 | image 2026-11-11 | Current stable line; 8.12 is in release candidate | Image `redis:8.10.3-alpine3.23`, run unmodified as a service. Managed hosts may offer Valkey, a Redis-compatible fork, which works the same with our client. |
 | Flutter | 3.50.0 (Dart 3.14.0) | 2026-11-11 | Google, quarterly stable releases | Newest stable; FlutterFire 5.2.0 already fixes Flutter 3.50 issues. Take 3.50 hotfixes as they come. |
 | OpenAPI lint | @redocly/cli 2.80.0 | 2026-11-18 | Very active (61 releases in 90 days) | Contract lint in CI from C3 |
@@ -846,7 +882,7 @@ All checked on **2026-11-18** from the sources the owner named: npm registry met
 | React | 19.3.1 | 2026-10-14 | Meta | Required by Next.js 16 |
 | next-intl | 4.15.1 | 2026-11-12 | The most used translation library for the App Router; 13 releases in 90 days | Server-side `lang` and `dir`, ICU messages |
 | Playwright | 1.65.1 | 2026-11-13 | Microsoft | Named in STACK.md |
-| ESLint, typescript-eslint, eslint-config-next | 9.39.5, 8.73.0, 16.4.6 | 2026-07-10, 2026-11-16, 2026-11-09 | Standard | One linter for all TypeScript apps (NestJS's template now uses oxlint; one tool across the repository is simpler). **ESLint 9, not 10.15.0:** eslint-config-next 16.4.6 pulls in `eslint-plugin-react` 7.37.5, `eslint-plugin-jsx-a11y` 6.10.2 and `eslint-plugin-import` 2.32.0, whose ESLint peer ranges stop at `^9`. One ESLint version for the whole repository keeps the shared config simple. Move to 10 when those plugins support it. |
+| ESLint, typescript-eslint, eslint-config-next | 10.15.0, 8.73.0, 16.4.6 | 2026-11-13, 2026-11-16, 2026-11-09 | Standard | One linter for all TypeScript apps (NestJS's template now uses oxlint; one tool across the repository is simpler). See the ESLint note below the table. |
 | Style Dictionary | 5.8.0 | 2026-11-03 | The most used token build tool; supports the W3C token format | Section 13 |
 | openapi-typescript, openapi-fetch | 7.13.0, 0.17.0 | both 2026-02-11 | Widely used; slower releases lately; its peer range still says TypeScript 5 | Types from the contract for the websites, S1. web-dev confirms generation under TypeScript 6 in the first S1 pull request; if it fails, types are written by hand and checked by contract tests. |
 | flutter_riverpod | 3.5.0 | 2026-11-06 | 2,919 likes, 4.3 million downloads in 30 days | Section 11.1 |
@@ -860,6 +896,14 @@ All checked on **2026-11-18** from the sources the owner named: npm registry met
 | intl, flutter_localizations | SDK-pinned (0.20.x) | | Dart and Flutter teams | `gen-l10n`; `intl` is declared as `any` so the Flutter SDK chooses the matching version |
 | flutter_lints, mocktail | 6.0.0, 1.0.5 | 2025-05-27, 2026-04-10 | Flutter team; widely used | Lint rules; test doubles |
 
+**ESLint note: 10.15.0 with a recorded peer override, not 9.39.5.**
+
+- **ESLint 9 is past end of life.** ESLint's own version-support table (`src/content/pages/version-support.md` in the eslint/eslint.org repository, read 2026-11-18) lists v9.0.0 to v9.39.5 as EOL, last release 2026-07-10, end of life 2026-08-06. npm's `maintenance` tag still points to 9.39.5, but no further 9.x fixes will come. Pinning it would mean starting on an unsupported linter.
+- **The conflict:** eslint-config-next 16.4.6 depends on `eslint-plugin-react` 7.37.5, `eslint-plugin-jsx-a11y` 6.10.2 and `eslint-plugin-import` 2.32.0, whose ESLint peer ranges stop at `^9`. `eslint-plugin-react-hooks` 7.1.1 and typescript-eslint 8.73.0 already accept `^10`.
+- **Checked on 2026-11-18:** in a throwaway folder I installed next 16.4.6, eslint-config-next 16.4.6 and TypeScript 6.0.3 with ESLint 10.15.0, then with 9.39.5, and linted the same sample files with `core-web-vitals` and `typescript` configs. Both versions gave identical results, including rules from each of the three capped plugins (`react/jsx-key`, `import/no-anonymous-default-export`, `jsx-a11y/alt-text`), `react-hooks/rules-of-hooks`, `@next/next/no-img-element` and `@typescript-eslint/no-unused-vars`. No crashes.
+- **So:** ESLint 10.15.0 everywhere. C1 records the override in the root `package.json` (`pnpm.peerDependencyRules.allowedVersions` with `eslint: 10` for exactly those three plugins), so the install is clean and the exception is visible. C8 must still prove that lint runs cleanly with these pins and record it in the pull request.
+- **Trigger to remove the override:** when all three plugins declare ESLint 10 in their peer ranges, or when a new eslint-config-next drops them, release-manager deletes the override in a dependency pull request. If any rule from them crashes under ESLint 10 before then, the fallback is to switch that rule off in the shared config and note it, not to return to an unsupported ESLint 9.
+
 ## 18. Dependency list per app
 
 The owner's approval of this document approves exactly these lists. Versions are exact. Anything else needs a new approval.
@@ -870,7 +914,7 @@ The owner's approval of this document approves exactly these lists. Versions are
 | --- | --- | --- | --- |
 | prettier | 3.10.1 | dev | C1 |
 | @redocly/cli | 2.80.0 | dev | C1 (used by CI from C3) |
-| eslint | 9.39.5 | dev | C1 |
+| eslint | 10.15.0 | dev | C1 (with the peer override in section 17) |
 | typescript-eslint | 8.73.0 | dev | C1 |
 | typescript | 6.0.3 | dev | C1 |
 
@@ -924,6 +968,7 @@ The owner's approval of this document approves exactly these lists. Versions are
 | next-intl | 4.15.1 | runtime | C8, C9 |
 | @feengo/design-tokens | workspace | runtime | C8, C9 |
 | openapi-fetch | 0.17.0 | runtime | S1 (admin-web), S2 (partner-web) |
+| jose | 6.2.17 | runtime | S1 (admin-web), S2 (partner-web): token check in `proxy.ts` and `requireAdmin()` |
 | typescript | 6.0.3 | dev | C8, C9 |
 | @types/node | 26.6.6 | dev | C8, C9 |
 | @types/react | 19.3.0 | dev | C8, C9 |
@@ -1020,7 +1065,7 @@ GitHub Actions maintained by GitHub (`actions/checkout`, `actions/setup-node`, `
 - The API reads only environment variables. A zod schema validates them at start-up, and the API refuses to start if one is missing or wrong (for example, the fake code provider outside `local` and `test`).
 - `.env.example` at the root lists every variable with a comment and a harmless placeholder; release-manager keeps it current.
 - API variables: `APP_ENV`, `PORT`, `LOG_LEVEL`, `TRUST_PROXY`, `DATABASE_URL` (app role), `DATABASE_MIGRATOR_URL`, `REDIS_URL`, `JWT_SIGNING_KEYS` (JSON list of Ed25519 keys with IDs), `JWT_ISSUER`, `ACCESS_TOKEN_TTL_SECONDS`, `CUSTOMER_REFRESH_TTL_DAYS`, `CUSTOMER_SESSION_MAX_DAYS`, `ADMIN_REFRESH_IDLE_MINUTES`, `ADMIN_SESSION_MAX_HOURS`, `REFRESH_REUSE_GRACE_SECONDS`, `OTP_CODE_PEPPER`, `PHONE_HASH_PEPPER`, `TOTP_ENCRYPTION_KEYS`, `OTP_WHATSAPP_PROVIDER`, `OTP_SMS_PROVIDER`, provider credentials, `FAKE_OTP_CODE` (local and test only), `REFRESH_REUSE_DETECTION_DAYS`, `REFRESH_RATE_PER_SESSION_PER_HOUR`, `BFF_FORWARDING_KEYS` (one key per website server, section 4.6), per-IP ceilings.
-- Website variables: `APP_ENV`, `API_BASE_URL` and `BFF_FORWARDING_KEY` (server side only; never `NEXT_PUBLIC_`).
+- Website variables: `APP_ENV`, `API_BASE_URL`, `BFF_FORWARDING_KEY`, `JWT_VERIFY_KEYS` (the API's **public** keys only, for the proxy's token check) and `TRUST_PROXY_HOPS` (server side only; never `NEXT_PUBLIC_`).
 - App: per-flavor JSON for `--dart-define-from-file`, no secrets.
 
 ### 19.3 Secrets
@@ -1032,7 +1077,7 @@ GitHub Actions maintained by GitHub (`actions/checkout`, `actions/setup-node`, `
 
 ## 20. Hosting options
 
-All three run the same Docker images and meet the security baseline. **Prices are estimates from published list prices as I know them; I could not reach the vendors' price pages from this environment, so please confirm before choosing.** Figures are per month, before VAT.
+All three run the same Docker images and meet the security baseline. **Requirement for any host: PostgreSQL 15 or later** (18 preferred), because the settings indexes use `NULLS NOT DISTINCT` (section 6.1); each option below offers it. **Prices are estimates from published list prices as I know them; I could not reach the vendors' price pages from this environment, so please confirm before choosing.** Figures are per month, before VAT.
 
 None of them stores data in Egypt. Egypt's Personal Data Protection Law (Law 151 of 2020) limits transfers of personal data abroad, generally requiring an adequate level of protection in the destination and a licence or permit from the Personal Data Protection Centre. A lawyer must confirm what FeenGo needs before production holds real customer data (staging holds only testers' data). If the lawyer requires hosting in Egypt, none of these fits, and local data centre providers would need quotes.
 
@@ -1125,7 +1170,7 @@ A new endpoint without its roles, rate limits or idempotency note then fails CI.
 12. **Firebase projects.** Please create `feengo-dev`, `feengo-staging` and `feengo-prod` (or allow release-manager to prepare the steps for you). Needed for C7.
 13. **Environments.** Agree that there is no separately hosted development environment, and that production is set up shortly before the first public release.
 14. **Billing tables.** DECISIONS says the billing structure exists in the database "from the start". The proposal is to create the plan tables in S2, together with the venues they belong to, switched off. Agree?
-15. **Additional endpoint.** The contract adds `GET /v1/admin/me`, which was not in the S1 list, so the back office can show who is signed in after a page reload, and every admin page checks the session through it (section 8.3). Agree?
+15. **Additional endpoint.** The contract adds `GET /v1/admin/me`, which was not in the S1 list, so the back office can show who is signed in and can add the API's deny-list check to every page (section 8.3). Agree? If not, the admin pages stay protected by the proxy's and `requireAdmin()`'s token checks and by the API refusing every data call (section 8.3).
 16. **iOS CI and path filters.** ROADMAP.md says the pipeline "builds all four apps on every push and pull request". Doing that for iOS on macOS costs far more than everything else (section 21, options A to C). Choose A (as written, several hundred US dollars a month), B (pull requests to `main` that touch the app, the architect's proposal), or C (B plus nightly). Also say whether Linux jobs may skip apps that did not change. Until you answer, Linux jobs run for every app on every push, and C10 waits. Needed before C10.
 17. **`customers` module.** STACK.md lists the modules auth, venues, availability, bookings, events, payments, notifications, settings and admin. The design adds `customers` for profile data (section 4.2). Agree?
 18. **Code rules as admin settings.** Make the code expiry, number of tries and lock time (and the resend and request limits) admin settings with the ranges in section 6.3, rather than fixed configuration? The defaults are the PRD's values either way. Needed before S1.
@@ -1145,7 +1190,7 @@ A new endpoint without its roles, rate limits or idempotency note then fails CI.
 | C-02 | S1 | Section 7; settings in 6.3; `POST /v1/auth/otp/request`, `POST /v1/auth/otp/verify`, `POST /v1/auth/refresh`, `POST /v1/auth/logout`; tables `otp_challenges`, `devices`, `refresh_tokens` | Code by WhatsApp, with SMS when WhatsApp refuses the message and SMS on request at resend (with the fake provider in CI and a real vendor on staging); expiry after 5 minutes, lock for 15 minutes after five wrong tries, limits per phone and per device, and the race tests in section 7.5. Late fallback after a WhatsApp delivery failure waits for the vendor choice (section 7.1). |
 | C-03 | S1 | Sections 11.3 and 14; `language` in `PATCH /v1/me` and `POST /v1/auth/otp/request`; `customers.language` | Every S1 screen works in both languages, Arabic right to left, and the choice is remembered on the phone and in the profile |
 | C-04 | S1 | Section 10; `GET`, `PATCH` and `DELETE /v1/me`; `customers` constraints | Name and optional email can be edited; deletion from inside the app removes personal data and ends every session |
-| A-01 | S1 | Sections 8.3 and 9.1 to 9.2; `POST /v1/admin/auth/sign-in`, `POST /v1/admin/auth/totp/verify`, `GET /v1/admin/me`; tables `admin_users`, `admin_sign_in_attempts` | No admin screen or admin endpoint works without both the password and the authenticator code, including with a forged cookie or the password step alone |
+| A-01 | S1 | Sections 8.3 and 9.1 to 9.2; `POST /v1/admin/auth/sign-in`, `POST /v1/admin/auth/totp/verify`, `GET /v1/admin/me`; tables `admin_users`, `admin_sign_in_attempts` | No admin screen or admin endpoint works without both the password and the authenticator code, including with a forged cookie or the password step alone, for full page loads, client-side (RSC) navigations, prefetches and server actions; checked in `proxy.ts`, in `requireAdmin()` and by the API |
 | A-11 | S1 | Sections 5.3 and 9.3; `GET /v1/admin/activity-log`; table `admin_activity_log` with its grants and trigger | Sign-ins, sign-outs, locks, seed-command actions (with the operator's name) and settings changes are recorded with who, what and when; a test shows that `UPDATE`, `DELETE` and `TRUNCATE` on the table fail for the app role |
 
 ## 24. Proposed decisions, awaiting the owner
@@ -1154,7 +1199,7 @@ These are the architect's proposals of 2026-11-18. None is in `docs/DECISIONS.md
 
 ### 24.1 Versions pinned for S0 and S1 (with this document)
 
-Node 26.13.1, pnpm 12.21.0, TypeScript 6.0.3, ESLint 9.39.5, PostgreSQL 18.7, Redis 8.10.3, Flutter 3.50.0, NestJS 12.5.1, Next.js 16.4.6, React 19.3.1, plus the exact lists in sections 17 and 18, all checked against their registries on 2026-11-18. TypeScript stays below 6.1 and ESLint on 9 because of the peer ranges of typescript-eslint and of the plugins in eslint-config-next.
+Node 26.13.1, pnpm 12.21.0, TypeScript 6.0.3, ESLint 10.15.0, PostgreSQL 18.7, Redis 8.10.3, Flutter 3.50.0, NestJS 12.5.1, Next.js 16.4.6, React 19.3.1, plus the exact lists in sections 17 and 18, all checked against their registries on 2026-11-18. TypeScript stays below 6.1 because of typescript-eslint's peer range. ESLint is on 10 because 9 reached end of life on 2026-08-06; three plugins inside eslint-config-next still declare ESLint 9 only, so a recorded peer override covers them until they catch up (section 17).
 
 ### 24.2 pnpm workspaces, no build orchestrator yet (with this document)
 
@@ -1190,7 +1235,7 @@ The API makes the codes, stores only their HMAC, and hands them to a provider in
 
 ### 24.10 Short access tokens, rotating refresh tokens, no tokens in web pages (with this document)
 
-15-minute Ed25519 JWTs; random single-use refresh tokens stored as hashes, with one successor only, returned again within a 10-second grace period from an encrypted cache, and the whole session ended on later reuse. The app keeps the refresh token in the Keychain or Keystore. The websites keep tokens in HttpOnly cookies set only in route handlers and `proxy.ts`; every admin page checks the session through the API; the `mfaToken` waits in its own short cookie until the second step.
+15-minute Ed25519 JWTs; random single-use refresh tokens stored as hashes, with one successor only, returned again within a 10-second grace period from an encrypted cache, and the whole session ended on later reuse. The app keeps the refresh token in the Keychain or Keystore. The websites keep tokens in HttpOnly cookies set only in route handlers and `proxy.ts`. The session is checked on every request, including client-side navigation, by a JWT check in `proxy.ts`, again by `requireAdmin()` in every admin page, server action and route handler, and finally by the API on every data call. The `mfaToken` waits in its own short cookie until the second step. `GET /v1/admin/me` (question 15) adds the API's deny-list check to page loads; if it is refused, the token checks and the API's refusal of every data call still protect every page, and an ended session can show at most an empty frame for up to 15 minutes.
 
 ### 24.11 Admin sign-in with email, password and an authenticator code (question 9)
 
