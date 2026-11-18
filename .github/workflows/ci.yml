@@ -120,31 +120,28 @@ jobs:
       - name: Migrate up
         env:
           APP_ENV: test
-          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@localhost:5432/feengo
+          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@127.0.0.1:5432/feengo
         run: pnpm --filter @feengo/api db:migrate
 
       - name: Migrate down to zero
         env:
           APP_ENV: test
-          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@localhost:5432/feengo
+          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@127.0.0.1:5432/feengo
         run: pnpm --filter @feengo/api db:migrate:down-all
 
       - name: Migrate up again
         env:
           APP_ENV: test
-          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@localhost:5432/feengo
+          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@127.0.0.1:5432/feengo
         run: pnpm --filter @feengo/api db:migrate
 
       - name: Regenerate database types
         env:
           APP_ENV: test
-          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@localhost:5432/feengo
+          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@127.0.0.1:5432/feengo
         run: pnpm --filter @feengo/api db:types
 
       - name: Check generated types are up to date
-        env:
-          APP_ENV: test
-          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@localhost:5432/feengo
         # git diff ignores untracked files, so first check the file is committed.
         run: |
           if ! git ls-files --error-unmatch apps/api/src/database/schema.generated.ts > /dev/null 2>&1; then
@@ -175,7 +172,7 @@ jobs:
           DATABASE_URL: postgres://feengo_app:ci-app-password@127.0.0.1:5432/feengo
           REDIS_URL: redis://127.0.0.1:6379
           # The migration tests connect as the migrator (throwaway CI password).
-          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@localhost:5432/feengo
+          DATABASE_MIGRATOR_URL: postgres://feengo_migrator:ci-migrator-password@127.0.0.1:5432/feengo
         run: pnpm --filter @feengo/api test
 
       # Built only, never pushed.

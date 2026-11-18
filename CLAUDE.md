@@ -71,5 +71,6 @@ Keep this section updated as the project grows.
 - Lint and format: `pnpm lint`, `pnpm format:check` (`pnpm format` to fix)
 - Start local services: `cp .env.example .env` once, then `docker compose up -d`. Stop: `docker compose down`. Reset the database: `docker compose down -v`
 - Backend: `pnpm --filter @feengo/api start:dev`. Checks: `pnpm --filter @feengo/api lint`, `typecheck`, `test` (the tests need the local services running)
+- Database: `pnpm --filter @feengo/api db:migrate` (latest), `db:migrate:down-all` (local and test only), `db:types` (regenerates `apps/api/src/database/schema.generated.ts`; export `DATABASE_MIGRATOR_URL` first). Commit the regenerated types; CI fails if they are stale
 - Mobile: `cd apps/mobile && flutter run`
 - Dashboards: `cd apps/partner-web && npm run dev`, `cd apps/admin-web && npm run dev`
