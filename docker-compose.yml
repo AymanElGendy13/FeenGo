@@ -1,0 +1,48 @@
+# Local services for development (APP_ENV=local). Not used for staging or production.
+# Ports are bound to 127.0.0.1 only. Every value can be overridden in a root .env file
+# (copy .env.example); the defaults below are local-only placeholders, not secrets.
+name: feengo
+
+services:
+  postgres:
+    image: postgres:18.7-alpine3.24
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-local-superuser-password}
+      POSTGRES_DB: ${POSTGRES_DB:-feengo}
+      # Read by docker/postgres/initdb/01-create-roles.sh on first start only.
+      FEENGO_MIGRATOR_PASSWORD: ${FEENGO_MIGRATOR_PASSWORD:-local-migrator-password}
+      FEENGO_APP_PASSWORD: ${FEENGO_APP_PASSWORD:-local-app-password}
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # TCP check on purpose: during first-start initialisation the server listens on
+      # its Unix socket only, so this stays unhealthy until the init script has run.
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -p 5432 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:8.10.3-alpine3.23
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep -q PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres-data:
+  redis-data:

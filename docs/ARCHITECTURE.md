@@ -67,14 +67,19 @@ Read with `docs/STACK.md` (the stack and the rules), `docs/PRD.md` (requirement 
 FeenGo/
   package.json              root workspace: scripts and shared dev tools only (release-manager, C1)
   pnpm-workspace.yaml       apps/api, apps/partner-web, apps/admin-web, packages/*,
-                            tests/contract, tests/e2e/web                          (release-manager, C1)
+                            tests/contract, tests/e2e/web; engineStrict, saveExact,
+                            the ESLint peer override, minimumReleaseAgeExclude      (release-manager, C1)
   pnpm-lock.yaml            one lockfile                                            (release-manager, C1)
-  .npmrc                    engine-strict, save-exact                               (release-manager, C1)
+  .npmrc                    engine-strict, save-exact, for npm and other tools      (release-manager, C1)
   .nvmrc                    26.13.1                                                 (release-manager, C1)
   tsconfig.base.json        strict TypeScript settings shared by all TS apps        (release-manager, C1)
   eslint.config.mjs         shared ESLint flat config                               (release-manager, C1)
   .prettierrc               formatting                                              (release-manager, C1)
+  .prettierignore           skips docs/, CLAUDE.md, .claude/, the lockfile and
+                            apps/mobile                                             (release-manager, C1)
   docker-compose.yml        local Postgres and Redis                                (release-manager, C1)
+  docker/postgres/initdb/
+    01-create-roles.sh      creates the two database roles (section 5.1)            (release-manager, C1)
   .env.example              every variable, no values that work anywhere real       (release-manager, C1)
   redocly.yaml              contract lint rules (section 21)                        (release-manager, C3)
   .github/workflows/        CI, every job                                           (release-manager)
@@ -101,7 +106,7 @@ FeenGo/
 
 **Shared web component library.** `packages/web-ui` is owned by web-dev and is created only when both websites need the same component, which is likely in S2 when the partner dashboard is built. Until then each website keeps its own components. Generated API types for the websites follow the same rule: inside `apps/admin-web` in S1, moved to a shared `packages/api-types` package once the partner dashboard also calls the API.
 
-**Root tooling is owned by release-manager.** C1 creates every root file: `package.json` with the root dev dependencies (section 18.1), `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `tsconfig.base.json`, `eslint.config.mjs`, `.prettierrc`, `.npmrc`, `.nvmrc`, `docker-compose.yml`, the database init script and `.env.example`. Later changes to root files are release-manager's too. App owners change only their own folder, including their own `package.json`.
+**Root tooling is owned by release-manager.** C1 creates every root file: `package.json` with the root dev dependencies (section 18.1), `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `tsconfig.base.json`, `eslint.config.mjs`, `.prettierrc`, `.prettierignore`, `.npmrc`, `.nvmrc`, `docker-compose.yml`, the database init script `docker/postgres/initdb/01-create-roles.sh` and `.env.example`. Later changes to root files are release-manager's too. App owners change only their own folder, including their own `package.json`.
 
 **Every CI job is written by release-manager.** For each increment, section 3 names whether the job arrives in the same pull request (release-manager adds it as a second owner, touching only `.github/`) or in a follow-up pull request.
 
@@ -110,6 +115,13 @@ FeenGo/
 **qa-tester's files live in `tests/`**, so qa-tester never edits another owner's folder. `tests/contract` and `tests/e2e/web` are workspace packages with their own dependencies (section 18.6). Maestro flows in `tests/e2e/mobile` find widgets by keys that mobile-dev adds; the list of keys is agreed in writing in the screen spec before the flow is written. Unit, widget and golden tests stay in each app and belong to that app's owner.
 
 **Rules for dependencies.** Exact versions (`save-exact`), one lockfile, `engine-strict` on Node. A dependency not listed in section 18 needs the owner's approval first (CLAUDE.md).
+
+**Where the pnpm settings live (learned in C1).**
+
+- **pnpm 12 reads `engineStrict` and `saveExact` only from `pnpm-workspace.yaml`** and ignores them in `.npmrc`. So C1 sets them in `pnpm-workspace.yaml`. `.npmrc` keeps `engine-strict` and `save-exact` for npm and other tools that read it.
+- **Node versions.** The root `package.json` has the range `"engines": { "node": ">=26.13.1 <27" }`, so a later Node 26 patch release does not block installs. `.nvmrc` stays on the exact version, 26.13.1, and the Docker images pin the exact version (section 17).
+- **`minimumReleaseAgeExclude` is temporary.** pnpm 12 holds back versions published less than a day ago. @redocly/cli 2.80.0 was published on the day C1 was built, so `pnpm-workspace.yaml` excludes exactly `@redocly/cli@2.80.0` from that rule. release-manager removes the entry in the next pull request that touches root files after 2026-11-19 13:11 UTC. That pull request must not add other exceptions.
+- **`.prettierignore`** keeps Prettier off documents (`docs/`, `CLAUDE.md`, `.claude/`), off the generated `pnpm-lock.yaml`, and off `apps/mobile`, which `dart format` formats. Prettier also skips everything in `.gitignore`.
 
 ## 3. S0 increments C1 to C11
 
@@ -143,7 +155,7 @@ ROADMAP.md's done-check needs the empty app running on a real iPhone and a real 
 
 ### 4.1 Framework
 
-NestJS 12 on Express 5 (the NestJS default), as ES modules, TypeScript 6.0 in strict mode. NestJS 12's own project template uses ES modules and Vitest, and this design follows that template rather than fighting it (section 17). Using Vitest instead of the Jest named in STACK.md is question 4 in section 22; section 18.7 has the Jest list if the owner refuses.
+NestJS 12 on Express 5 (the NestJS default), as ES modules, TypeScript 6.0 in strict mode. NestJS 12's own project template uses ES modules and Vitest, and this design follows that template rather than fighting it (section 17). The owner chose Vitest instead of Jest on 2026-11-18 (question 4 in section 22, DECISIONS.md); STACK.md now names Vitest.
 
 ### 4.2 Modules and table ownership
 
@@ -237,8 +249,10 @@ Alternatives considered:
 
 **Database roles**, created once per environment:
 
-- `feengo_migrator` owns the schema and runs migrations.
-- `feengo_app` is what the API connects as: `SELECT, INSERT, UPDATE, DELETE` on ordinary tables, only `SELECT, INSERT` on `admin_activity_log`, no DDL.
+- `feengo_migrator` owns the database and the `public` schema, and runs migrations. On PostgreSQL 15 and later the database owner also owns `public` (`pg_database_owner`), so only the migrator can create objects there.
+- `feengo_app` is what the API connects as. It gets **only `CONNECT` on the database** and `USAGE` on `public`, plus **default privileges**: `SELECT, INSERT, UPDATE, DELETE` on every table and `USAGE, SELECT` on every sequence that the migrator creates (`ALTER DEFAULT PRIVILEGES FOR ROLE feengo_migrator IN SCHEMA public ...`). No DDL, no temporary tables, and `PUBLIC` loses its rights on the database and its `CREATE` on `public`. Locally, C1's `docker/postgres/initdb/01-create-roles.sh` does this.
+- **Tables that need less revoke the rest in their own migration.** Because of the default privileges, every new table starts with full DML for the app role. So the S1 migration that creates `admin_activity_log` must explicitly run `REVOKE UPDATE, DELETE, TRUNCATE ON admin_activity_log FROM feengo_app` (section 5.3), and its `down` drops the table. A named S1 test proves the result: **`A-11 the app role cannot update, delete or truncate activity-log rows`**. It asserts with `has_table_privilege('feengo_app', 'admin_activity_log', ...)` that `SELECT` and `INSERT` are true and `UPDATE`, `DELETE` and `TRUNCATE` are false. The trigger tests are separate and must run as a role that still holds those privileges, such as `feengo_migrator`. Run as the app role, they would fail on the missing grants before the trigger fires, and so prove nothing about the trigger.
+- **Staging and production** create the roles by the same steps on the host, written down by release-manager and run once with the host's admin user. They also revoke CONNECT from PUBLIC on every database other than the app's (`postgres`, `template1` or the host's equivalents), for example `REVOKE CONNECT ON DATABASE postgres FROM PUBLIC`, so the app and migrator roles can connect only to the app's database. The local Compose stack does not do this, which is acceptable for a throwaway local database.
 
 **Conventions**: snake_case names; `uuid` keys from `gen_random_uuid()` (built in since PostgreSQL 13, so nothing depends on PostgreSQL 18-only features); `created_at` and `updated_at` as `timestamptz not null default now()`; enumerations as `text` with a `CHECK`, which is easier to extend by migration than a Postgres `enum` type; foreign keys `ON DELETE RESTRICT` unless stated, because rows are anonymised, not deleted.
 
@@ -382,7 +396,7 @@ The one place where admin sign-in failures and locks are kept, for known and unk
 | `ip_address` | inet, null | of the admin, for security review |
 
 - Indexes: `(occurred_at DESC)`, `(actor_admin_id, occurred_at DESC)`, `(target_type, target_id, occurred_at DESC)`, `(action, occurred_at DESC)`.
-- Append-only, enforced by the database and not only by code: `feengo_app` has only `SELECT, INSERT`, and a `BEFORE UPDATE OR DELETE OR TRUNCATE ... FOR EACH STATEMENT` trigger raises an error (statement level, because `TRUNCATE` triggers can only be statement level). This stops the API, any bug in it and any mistake by an operator using the app role.
+- Append-only, enforced by the database and not only by code: `feengo_app` has only `SELECT, INSERT` (the migration revokes `UPDATE` and `DELETE`, which the default privileges in section 5.1 would otherwise grant, and `TRUNCATE` as a safeguard), and a `BEFORE UPDATE OR DELETE OR TRUNCATE ... FOR EACH STATEMENT` trigger raises an error (statement level, because `TRUNCATE` triggers can only be statement level). This stops the API, any bug in it and any mistake by an operator using the app role.
 - **What it does not stop:** the table owner (`feengo_migrator`) or a database superuser can drop or disable the trigger. That is why the migrator credentials are kept separately from the app's, down migrations are refused outside development (section 5.1), and the deploy pipeline runs only forward migrations. Making tampering by those roles detectable needs a hash chain or an off-site copy of the log, a possible later step (section 9.3).
 - Written in the same transaction as the action it records, so an action cannot happen without its entry.
 - Kept indefinitely until a lawyer sets a retention period.
@@ -886,7 +900,7 @@ All checked on **2026-11-18** from the sources the owner named: npm registry met
 | libphonenumber-js | 1.13.16 | 2026-11-10 | The standard phone number library for JavaScript | Validates mobile numbers and their country |
 | nestjs-pino, pino, pino-http | 5.3.2, 10.4.0, 11.0.0 | 2026-11-17, 2026-10-02, 2025-10-04 | The usual fast JSON logger for NestJS | Structured logs with request IDs and redaction |
 | helmet | 8.3.0 | 2026-07-12 | The standard security headers middleware | Security headers |
-| Vitest | 4.1.12 | 2026-10-15 | Very widely used; the 4.x line is still maintained after 5.0 | Matches the NestJS 12 template (`^4.1.2`); 5.x can follow once NestJS moves. Depends on question 4; the Jest list is in section 18.7 |
+| Vitest | 4.1.12 | 2026-10-15 | Very widely used; the 4.x line is still maintained after 5.0 | Matches the NestJS 12 template (`^4.1.2`); 5.x can follow once NestJS moves. Chosen over Jest by the owner on 2026-11-18 (question 4) |
 | Next.js | 16.4.6 | 2026-11-09 | Vercel; 20 releases in 90 days | Current stable major |
 | React | 19.3.1 | 2026-10-14 | Meta | Required by Next.js 16 |
 | next-intl | 4.15.1 | 2026-11-12 | The most used translation library for the App Router; 13 releases in 90 days | Server-side `lang` and `dir`, ICU messages |
@@ -936,6 +950,9 @@ The owner's approval of this document approves exactly these lists. Versions are
 | eslint | 10.15.0 | dev | C1 (with the peer override in section 17) |
 | typescript-eslint | 8.73.0 | dev | C1 |
 | typescript | 6.0.3 | dev | C1 |
+| @eslint/js | 10.0.1 | dev | C1 follow-up (release-manager; approved 2026-11-18, question 22) |
+
+**About `@eslint/js` 10.0.1.** Approved by the owner on 2026-11-18 (question 22, DECISIONS.md); release-manager adds it in a small root-tooling pull request. It provides `js.configs.recommended`, ESLint's own core rules (`no-undef`, `no-const-assign`, `no-debugger` and others). Today `eslint.config.mjs` runs only typescript-eslint's recommended rules. Since ESLint 10, `@eslint/js` is no longer released together with `eslint`: 10.0.1 (2026-02-06, npm `latest`) is the newest 10.x, and its peer range `eslint: ^10.0.0` (optional) covers 10.15.0; its `engines` allow Node 24 and later. Checked on 2026-11-18 in a throwaway folder with Node 26.13.1 and pnpm 12.21.0: eslint 10.15.0, @eslint/js 10.0.1, typescript-eslint 8.73.0 and TypeScript 6.0.3 installed cleanly, `pnpm peers check` found no issues, and `extends: [js.configs.recommended, tseslint.configs.recommended]` reported the expected core-rule errors on a sample file. typescript-eslint's recommended set already turns off core rules that TypeScript checks better (such as `no-undef`) in `.ts` files. Plain `.js` and `.mjs` files that use Node globals such as `process` need `languageOptions.globals` in the shared config; listing them by hand avoids adding the `globals` package.
 
 ### 18.2 `apps/api` (backend-dev)
 
@@ -1050,6 +1067,8 @@ Expected in later slices, **not** approved now: `app_links` 7.2.2 and `play_inst
 Maestro is a command-line tool installed in CI, not a package; qa-tester pins its version in C11.
 
 ### 18.7 Fallback if Vitest is refused (question 4)
+
+**Not used: Vitest was chosen (DECISIONS 2026-11-18).** The list is kept for reference only and is not approved.
 
 If the owner keeps Jest, these replace the Vitest rows; everything else stays the same.
 
@@ -1179,12 +1198,17 @@ A new endpoint without its roles, rate limits or idempotency note then fails CI.
 - Caches: the pnpm store, the pub cache, Gradle and the Flutter SDK.
 - Deployment to staging (from S1) and signed tester builds with Fastlane are added by release-manager once the host is chosen; they are outside S0.
 
+**Notes for C3, learned in C1.**
+
+- **Database roles in CI.** GitHub Actions service containers start before the repository is checked out, so they cannot mount `docker/postgres/initdb/`. The api job therefore runs `docker/postgres/initdb/01-create-roles.sh` itself, from the runner, against the Postgres service, after checkout and before migrations. It sets `PGHOST` (and `PGPORT`) to the service and `PGPASSWORD` to the service's superuser password, with `POSTGRES_USER`, `POSTGRES_DB`, `FEENGO_MIGRATOR_PASSWORD` and `FEENGO_APP_PASSWORD` in the step's environment. The runner needs a psql of version 15 or later for `\getenv`. The passwords are throwaway CI values, not secrets.
+- **Redocly telemetry off.** The contract job sets `REDOCLY_TELEMETRY=off`, so @redocly/cli sends no usage data from CI. Without it, the CLI tries to reach its telemetry host (`otel.cloud.redocly.com`) on each run, which this environment's network refused.
+
 ## 22. Questions for the owner
 
 1. **Hosting.** Choose option A, B or C (section 20) before S1. I recommend A.
 2. **Lawyer on data location.** Is hosting outside Egypt allowed for production, and what licence or permit does PDPL require? Staging can start before the answer.
 3. **Code vendors.** Choose the WhatsApp and SMS providers (section 7.3) and start Egyptian SMS sender ID registration and the Meta Business verification now, because both take time.
-4. **Vitest instead of Jest.** STACK.md lists Jest. NestJS 12's own template has moved to Vitest, and Jest is awkward with ES modules. I propose Vitest for the API, website and contract tests (its test syntax is almost the same as Jest's). This changes a line in STACK.md, so it needs your approval. If you refuse, section 18.7 has the exact Jest list. Needed before C2.
+4. **Vitest instead of Jest.** **Answered 2026-11-18:** Vitest for the API, website and contract tests; STACK.md updated (DECISIONS.md). Original question: STACK.md listed Jest. NestJS 12's own template has moved to Vitest, and Jest is awkward with ES modules. I propose Vitest for the API, website and contract tests (its test syntax is almost the same as Jest's). This changes a line in STACK.md, so it needs your approval. If you refuse, section 18.7 has the exact Jest list. Needed before C2.
 5. **Account deletion (C-04).** Approve the proposal in section 10, including the "sign in again within 10 minutes" step. With a lawyer: should a keyed hash of the phone be kept so no-show strikes survive deletion? Should deletion wait while a paid deposit is pending (from S6)? How long are anonymised records kept?
 6. **Analytics consent.** Must the app ask for consent before sending analytics, under PDPL? The design supports both.
 7. **Phone numbers.** Accept Egyptian numbers (+20) only at launch? (`auth.otp.allowed_country_codes`, changeable later.)
@@ -1201,6 +1225,15 @@ A new endpoint without its roles, rate limits or idempotency note then fails CI.
 18. **Code rules as admin settings.** Make the code expiry, number of tries and lock time (and the resend and request limits) admin settings with the ranges in section 6.3, rather than fixed configuration? The defaults are the PRD's values either way. Needed before S1.
 19. **C-01 and "done" for S1.** ROADMAP.md says a slice is done when tests pass for all of its acceptance checks. C-01's check needs venue pages and booking, which come in S3 and S4, so S1 can only test part of it (section 23). Proposal: S1 counts as done with C-01's S1 part tested, and the rest of C-01 is checked in S3 and S4.
 20. **S1 testers, internal or external?** Internal TestFlight testers (members of your App Store Connect team, up to 100) need no review. External testers need Apple's Beta App Review, which needs a demo account that can sign in without a real phone. If S1 goes to external testers, the demo sign-in (Q-07) must be designed in S1 rather than before the public release.
+21. **Node 26 in every environment. Needed before C2.** **Answered 2026-11-18:** option (b): in cloud sessions the session-start hook installs Node 26.13.1 from nodejs.org, checks its checksum, caches it and writes PATH to `$CLAUDE_ENV_FILE`; `nvm use` with `.nvmrc` on developer machines, `actions/setup-node` with `node-version-file: .nvmrc` in CI; release-manager writes the hook change and the owner merges it (DECISIONS.md). `engineStrict` refuses any Node outside `>=26.13.1 <27`. The cloud development container has Node 22, and C1 could only be built with a Node 26 downloaded for one session. Choose one:
+    - (a) pnpm's `devEngines.runtime` (`node` 26.13.1, `onFail: "download"`) in the root `package.json`, so pnpm fetches the pinned Node on every machine and in CI.
+    - (b) `.claude/hooks/session-start.sh` installs Node 26.13.1 in cloud sessions only. Developer machines use `.nvmrc`, and CI uses `actions/setup-node` with `node-version-file: .nvmrc`.
+    - (c) Both.
+
+    **Test of (a), 2026-11-18,** with Node 22.23.5 on PATH, a package.json pinned to pnpm 12.21.0 and `devEngines.runtime` node 26.13.1 with download. pnpm 12.21.0 supports the field: it resolved `node@runtime:26.13.1`. But `pnpm install` failed with exit code 1: to write checksums for every platform into the lockfile, pnpm also fetches `https://unofficial-builds.nodejs.org/download/release/v26.13.1/SHASUMS256.txt` (the musl builds), and this environment's network refuses that host. Limiting `supportedArchitectures` did not avoid the fetch. The Node mirror setting is read only from the global pnpm config or environment, not from `pnpm-workspace.yaml`. After the failed install, `pnpm exec node -v` printed a warning, then ran **v22.23.5** and exited 0. So when the runtime download fails, `pnpm exec` falls back to the system Node with only a warning, and exits 0. A plain download from nodejs.org works here: `pnpm env use --global 26.13.1` fetched 26.13.1 and ran it. The successful path of (a) could not be shown from here.
+
+    **Recommendation: (b).** It fixes the one environment that lacks Node 26, without depending on a host this environment refuses. It leaves `package.json` and the lockfile alone. The hook downloads the Linux x64 build from nodejs.org, checks its SHA-256 against `SHASUMS256.txt`, unpacks it outside the repository, and puts it first on PATH for the session. It reads the version from `.nvmrc`, and like today's hook it never fails the session start: the download has a timeout, and the unpacked Node is cached so later sessions reuse it. A SessionStart hook runs in a child process, so changing PATH there does not reach the session; the hook keeps PATH for the session by writing it to `$CLAUDE_ENV_FILE`. **Not yet shown: the hook itself.** The pull request that adds it must show `node -v` printing 26.13.1 in a new cloud session. Revisit (a) if the cloud network allows `unofficial-builds.nodejs.org`. Option (a) or (c) changes the root `package.json`, so release-manager would make it in a small follow-up pull request that you merge. Option (b) changes `.claude/`, so it also goes in a small pull request that you merge, with release-manager proposed as its writer.
+22. **Add `@eslint/js` 10.0.1** to the root dev dependencies (section 18.1). **Answered 2026-11-18:** approved, with `js.configs.recommended` turned on; release-manager adds it (DECISIONS.md). Original question: it turns on ESLint's own recommended rules (`js.configs.recommended`) in `eslint.config.mjs`. Today only typescript-eslint's recommended rules run. It is a new dependency, so it needs your approval. If you approve, release-manager adds it in a small root-tooling pull request.
 
 ## 23. Traceability
 
@@ -1216,11 +1249,11 @@ A new endpoint without its roles, rate limits or idempotency note then fails CI.
 | C-03 | S1 | Sections 11.3 and 14; `language` in `PATCH /v1/me` and `POST /v1/auth/otp/request`; `customers.language` | Every S1 screen works in both languages, Arabic right to left, and the choice is remembered on the phone and in the profile |
 | C-04 | S1 | Section 10; `GET`, `PATCH` and `DELETE /v1/me`; `customers` constraints | Name and optional email can be edited; deletion from inside the app removes personal data and ends every session |
 | A-01 | S1 | Sections 8.3 and 9.1 to 9.2; `POST /v1/admin/auth/sign-in`, `POST /v1/admin/auth/totp/verify`, `GET /v1/admin/me`; tables `admin_users`, `admin_sign_in_attempts` | No admin screen or admin endpoint works without both the password and the authenticator code, including with a forged cookie or the password step alone, for full page loads, client-side (RSC) navigations, prefetches and server actions; checked in `proxy.ts`, in `requireAdmin()` and by the API |
-| A-11 | S1 | Sections 5.3 and 9.3; `GET /v1/admin/activity-log`; table `admin_activity_log` with its grants and trigger | Sign-ins, sign-outs, locks, seed-command actions (with the operator's name) and settings changes are recorded with who, what and when; a test shows that `UPDATE`, `DELETE` and `TRUNCATE` on the table fail for the app role |
+| A-11 | S1 | Sections 5.3 and 9.3; `GET /v1/admin/activity-log`; table `admin_activity_log` with its grants and trigger | Sign-ins, sign-outs, locks, seed-command actions (with the operator's name) and settings changes are recorded with who, what and when; a test shows that `UPDATE`, `DELETE` and `TRUNCATE` on the table fail for the app role, and `A-11 the app role cannot update, delete or truncate activity-log rows` checks the grants with `has_table_privilege`; the trigger tests run as a role that holds those privileges, such as `feengo_migrator` (section 5.1) |
 
 ## 24. Proposed decisions, awaiting the owner
 
-These are the architect's proposals of 2026-11-18. None is in `docs/DECISIONS.md` yet, because that file holds only decisions the owner has made. Each entry says how it is decided. "With this document" means approving this document approves it; "question N" means it is decided by the answer to that question in section 22. Once decided, each entry moves to `docs/DECISIONS.md` with the date of the owner's answer.
+These are the architect's proposals of 2026-11-18. Only entries marked "Decided" are in `docs/DECISIONS.md`, because that file holds only decisions the owner has made. Each entry says how it is decided. "With this document" means approving this document approves it; "question N" means it is decided by the answer to that question in section 22. Once decided, each entry moves to `docs/DECISIONS.md` with the date of the owner's answer.
 
 ### 24.1 Versions pinned for S0 and S1 (with this document)
 
@@ -1232,7 +1265,9 @@ The API, both websites, the shared packages and qa-tester's test packages form o
 
 ### 24.3 NestJS 12 on Node 26 LTS, with TypeScript 6.0 (with this document); Vitest (question 4)
 
-NestJS 12 on Express, as ES modules, on Node 26, the active LTS release. Vitest 4 for tests, as NestJS 12's own template uses, because Jest is awkward with ES modules. Vitest replaces a line in STACK.md, so it waits for question 4; the Jest fallback list is in section 18.7.
+**Vitest: Decided 2026-11-18, see DECISIONS.md.** The rest of this entry is decided with this document.
+
+NestJS 12 on Express, as ES modules, on Node 26, the active LTS release. Vitest 4 for tests, as NestJS 12's own template uses, because Jest is awkward with ES modules. Vitest replaced Jest in STACK.md; decided by question 4 on 2026-11-18. The unused Jest list is kept in section 18.7.
 
 ### 24.4 API conventions (with this document)
 
@@ -1297,3 +1332,15 @@ Linux jobs for every app on every push and pull request. The iOS build on macOS 
 ### 24.19 Hosting (question 1)
 
 Option A, DigitalOcean in Frankfurt, recommended over Hetzner (cheapest, most work) and Google Cloud in Doha or Dammam (closest, dearest). Data location subject to the lawyer (question 2).
+
+### 24.20 Node 26 in cloud sessions through the session-start hook (question 21)
+
+**Decided 2026-11-18, see DECISIONS.md.**
+
+Option (b): `.claude/hooks/session-start.sh` installs the Node version in `.nvmrc` from nodejs.org, checked against its SHA-256, in cloud sessions only. Developer machines use `.nvmrc`, CI uses `actions/setup-node` with `.nvmrc`, and the Docker images pin Node themselves. The hook keeps PATH for the session through `$CLAUDE_ENV_FILE`, uses a download timeout and caches the unpacked Node, so it never fails the session start. Not yet shown: the hook itself; its pull request must show `node -v` printing 26.13.1 in a new cloud session. pnpm's `devEngines.runtime` download was tested and is not used for now: in this environment `pnpm install` fails on the musl checksum host, and `pnpm exec` then runs with the system Node. Needed before C2.
+
+### 24.21 ESLint's core recommended rules through `@eslint/js` 10.0.1 (question 22)
+
+**Decided 2026-11-18, see DECISIONS.md.**
+
+Add `@eslint/js` 10.0.1, the newest 10.x, whose peer range covers ESLint 10.15.0, and extend `js.configs.recommended` before typescript-eslint's recommended set in `eslint.config.mjs`.

@@ -1,0 +1,33 @@
+# Workspace packages (docs/ARCHITECTURE.md section 2). apps/mobile is Flutter
+# and is deliberately not part of the pnpm workspace.
+packages:
+  - apps/api
+  - apps/partner-web
+  - apps/admin-web
+  - packages/*
+  - tests/contract
+  - tests/e2e/web
+
+# Dependency rules (docs/ARCHITECTURE.md section 2): exact versions and a strict
+# Node engine check. pnpm 12 reads these settings only from this file, not from
+# .npmrc, so they are set here as well as in .npmrc.
+engineStrict: true
+saveExact: true
+
+# eslint-config-next 16.4.6 brings eslint-plugin-react, eslint-plugin-jsx-a11y
+# and eslint-plugin-import, whose ESLint peer ranges stop at ^9. ESLint 9 is past
+# end of life, so ESLint 10 is allowed for these three plugins only
+# (docs/ARCHITECTURE.md section 17). Remove this block when all three declare
+# ESLint 10, or when eslint-config-next drops them.
+peerDependencyRules:
+  allowedVersions:
+    eslint-plugin-react>eslint: "10"
+    eslint-plugin-jsx-a11y>eslint: "10"
+    eslint-plugin-import>eslint: "10"
+
+# pnpm 12 holds back versions published less than a day ago. @redocly/cli 2.80.0
+# (section 18.1) was published on 2026-11-18, the day C1 was built, so pnpm added
+# this exact-version exception. Remove it once pnpm's age limit clears for
+# @redocly/cli@2.80.0, after 2026-11-19 13:11 UTC.
+minimumReleaseAgeExclude:
+  - "@redocly/cli@2.80.0"

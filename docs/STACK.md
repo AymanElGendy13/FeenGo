@@ -17,7 +17,7 @@ The stack was confirmed on 18 November 2026. Changing any line here needs an ent
 | Maps | Google Maps | |
 | Hosting | Docker containers on low-cost hosting now, AWS when scaling | The low-cost host is chosen before S1. Development, staging and production stay separate. |
 | Build pipeline | GitHub Actions, Fastlane | Fastlane handles store uploads |
-| Testing | Flutter tests, Maestro or Appium, Playwright, Jest, k6 | |
+| Testing | Flutter tests, Maestro or Appium, Playwright, Vitest, k6 | |
 
 ## Architecture rules
 
