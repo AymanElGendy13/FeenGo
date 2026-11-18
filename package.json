@@ -13,6 +13,7 @@
     "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@redocly/cli": "2.80.0",
     "eslint": "10.15.0",
     "prettier": "3.10.1",
