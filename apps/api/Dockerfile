@@ -3,8 +3,15 @@
 #
 #   docker build -f apps/api/Dockerfile -t feengo-api .
 #
+# The image is for APP_ENV test, staging and production. It does not start with
+# APP_ENV=local: local logging uses pino-pretty, a dev dependency that the image
+# leaves out. For local development, run the API with pnpm (CLAUDE.md).
+#
 # Configuration comes only from environment variables at run time
 # (docs/ARCHITECTURE.md section 19). No .env file is copied in (.dockerignore).
+#
+# Accepted for now: the base image is pinned by tag, not digest, as in section 17,
+# and pnpm is installed with `npm i -g` at its exact version, with no integrity hash.
 
 ARG NODE_IMAGE=node:26.13.1-alpine3.24
 
