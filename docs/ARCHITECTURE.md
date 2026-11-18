@@ -155,7 +155,7 @@ ROADMAP.md's done-check needs the empty app running on a real iPhone and a real 
 
 ### 4.1 Framework
 
-NestJS 12 on Express 5 (the NestJS default), as ES modules, TypeScript 6.0 in strict mode. NestJS 12's own project template uses ES modules and Vitest, and this design follows that template rather than fighting it (section 17). Using Vitest instead of the Jest named in STACK.md is question 4 in section 22; section 18.7 has the Jest list if the owner refuses.
+NestJS 12 on Express 5 (the NestJS default), as ES modules, TypeScript 6.0 in strict mode. NestJS 12's own project template uses ES modules and Vitest, and this design follows that template rather than fighting it (section 17). The owner chose Vitest instead of Jest on 2026-11-18 (question 4 in section 22, DECISIONS.md); STACK.md now names Vitest.
 
 ### 4.2 Modules and table ownership
 
@@ -900,7 +900,7 @@ All checked on **2026-11-18** from the sources the owner named: npm registry met
 | libphonenumber-js | 1.13.16 | 2026-11-10 | The standard phone number library for JavaScript | Validates mobile numbers and their country |
 | nestjs-pino, pino, pino-http | 5.3.2, 10.4.0, 11.0.0 | 2026-11-17, 2026-10-02, 2025-10-04 | The usual fast JSON logger for NestJS | Structured logs with request IDs and redaction |
 | helmet | 8.3.0 | 2026-07-12 | The standard security headers middleware | Security headers |
-| Vitest | 4.1.12 | 2026-10-15 | Very widely used; the 4.x line is still maintained after 5.0 | Matches the NestJS 12 template (`^4.1.2`); 5.x can follow once NestJS moves. Depends on question 4; the Jest list is in section 18.7 |
+| Vitest | 4.1.12 | 2026-10-15 | Very widely used; the 4.x line is still maintained after 5.0 | Matches the NestJS 12 template (`^4.1.2`); 5.x can follow once NestJS moves. Chosen over Jest by the owner on 2026-11-18 (question 4) |
 | Next.js | 16.4.6 | 2026-11-09 | Vercel; 20 releases in 90 days | Current stable major |
 | React | 19.3.1 | 2026-10-14 | Meta | Required by Next.js 16 |
 | next-intl | 4.15.1 | 2026-11-12 | The most used translation library for the App Router; 13 releases in 90 days | Server-side `lang` and `dir`, ICU messages |
@@ -950,8 +950,9 @@ The owner's approval of this document approves exactly these lists. Versions are
 | eslint | 10.15.0 | dev | C1 (with the peer override in section 17) |
 | typescript-eslint | 8.73.0 | dev | C1 |
 | typescript | 6.0.3 | dev | C1 |
+| @eslint/js | 10.0.1 | dev | C1 follow-up (release-manager; approved 2026-11-18, question 22) |
 
-**Proposed: `@eslint/js` 10.0.1 (question 22), dev, root.** Not part of the approved list above, and not installed until the owner answers. It provides `js.configs.recommended`, ESLint's own core rules (`no-undef`, `no-const-assign`, `no-debugger` and others). Today `eslint.config.mjs` runs only typescript-eslint's recommended rules. Since ESLint 10, `@eslint/js` is no longer released together with `eslint`: 10.0.1 (2026-02-06, npm `latest`) is the newest 10.x, and its peer range `eslint: ^10.0.0` (optional) covers 10.15.0; its `engines` allow Node 24 and later. Checked on 2026-11-18 in a throwaway folder with Node 26.13.1 and pnpm 12.21.0: eslint 10.15.0, @eslint/js 10.0.1, typescript-eslint 8.73.0 and TypeScript 6.0.3 installed cleanly, `pnpm peers check` found no issues, and `extends: [js.configs.recommended, tseslint.configs.recommended]` reported the expected core-rule errors on a sample file. typescript-eslint's recommended set already turns off core rules that TypeScript checks better (such as `no-undef`) in `.ts` files. Plain `.js` and `.mjs` files that use Node globals such as `process` need `languageOptions.globals` in the shared config; listing them by hand avoids adding the `globals` package.
+**About `@eslint/js` 10.0.1.** Approved by the owner on 2026-11-18 (question 22, DECISIONS.md); release-manager adds it in a small root-tooling pull request. It provides `js.configs.recommended`, ESLint's own core rules (`no-undef`, `no-const-assign`, `no-debugger` and others). Today `eslint.config.mjs` runs only typescript-eslint's recommended rules. Since ESLint 10, `@eslint/js` is no longer released together with `eslint`: 10.0.1 (2026-02-06, npm `latest`) is the newest 10.x, and its peer range `eslint: ^10.0.0` (optional) covers 10.15.0; its `engines` allow Node 24 and later. Checked on 2026-11-18 in a throwaway folder with Node 26.13.1 and pnpm 12.21.0: eslint 10.15.0, @eslint/js 10.0.1, typescript-eslint 8.73.0 and TypeScript 6.0.3 installed cleanly, `pnpm peers check` found no issues, and `extends: [js.configs.recommended, tseslint.configs.recommended]` reported the expected core-rule errors on a sample file. typescript-eslint's recommended set already turns off core rules that TypeScript checks better (such as `no-undef`) in `.ts` files. Plain `.js` and `.mjs` files that use Node globals such as `process` need `languageOptions.globals` in the shared config; listing them by hand avoids adding the `globals` package.
 
 ### 18.2 `apps/api` (backend-dev)
 
@@ -1066,6 +1067,8 @@ Expected in later slices, **not** approved now: `app_links` 7.2.2 and `play_inst
 Maestro is a command-line tool installed in CI, not a package; qa-tester pins its version in C11.
 
 ### 18.7 Fallback if Vitest is refused (question 4)
+
+**Not used: Vitest was chosen (DECISIONS 2026-11-18).** The list is kept for reference only and is not approved.
 
 If the owner keeps Jest, these replace the Vitest rows; everything else stays the same.
 
@@ -1205,7 +1208,7 @@ A new endpoint without its roles, rate limits or idempotency note then fails CI.
 1. **Hosting.** Choose option A, B or C (section 20) before S1. I recommend A.
 2. **Lawyer on data location.** Is hosting outside Egypt allowed for production, and what licence or permit does PDPL require? Staging can start before the answer.
 3. **Code vendors.** Choose the WhatsApp and SMS providers (section 7.3) and start Egyptian SMS sender ID registration and the Meta Business verification now, because both take time.
-4. **Vitest instead of Jest.** STACK.md lists Jest. NestJS 12's own template has moved to Vitest, and Jest is awkward with ES modules. I propose Vitest for the API, website and contract tests (its test syntax is almost the same as Jest's). This changes a line in STACK.md, so it needs your approval. If you refuse, section 18.7 has the exact Jest list. Needed before C2.
+4. **Vitest instead of Jest.** **Answered 2026-11-18:** Vitest for the API, website and contract tests; STACK.md updated (DECISIONS.md). STACK.md lists Jest. NestJS 12's own template has moved to Vitest, and Jest is awkward with ES modules. I propose Vitest for the API, website and contract tests (its test syntax is almost the same as Jest's). This changes a line in STACK.md, so it needs your approval. If you refuse, section 18.7 has the exact Jest list. Needed before C2.
 5. **Account deletion (C-04).** Approve the proposal in section 10, including the "sign in again within 10 minutes" step. With a lawyer: should a keyed hash of the phone be kept so no-show strikes survive deletion? Should deletion wait while a paid deposit is pending (from S6)? How long are anonymised records kept?
 6. **Analytics consent.** Must the app ask for consent before sending analytics, under PDPL? The design supports both.
 7. **Phone numbers.** Accept Egyptian numbers (+20) only at launch? (`auth.otp.allowed_country_codes`, changeable later.)
@@ -1222,7 +1225,7 @@ A new endpoint without its roles, rate limits or idempotency note then fails CI.
 18. **Code rules as admin settings.** Make the code expiry, number of tries and lock time (and the resend and request limits) admin settings with the ranges in section 6.3, rather than fixed configuration? The defaults are the PRD's values either way. Needed before S1.
 19. **C-01 and "done" for S1.** ROADMAP.md says a slice is done when tests pass for all of its acceptance checks. C-01's check needs venue pages and booking, which come in S3 and S4, so S1 can only test part of it (section 23). Proposal: S1 counts as done with C-01's S1 part tested, and the rest of C-01 is checked in S3 and S4.
 20. **S1 testers, internal or external?** Internal TestFlight testers (members of your App Store Connect team, up to 100) need no review. External testers need Apple's Beta App Review, which needs a demo account that can sign in without a real phone. If S1 goes to external testers, the demo sign-in (Q-07) must be designed in S1 rather than before the public release.
-21. **Node 26 in every environment. Needed before C2.** `engineStrict` refuses any Node outside `>=26.13.1 <27`. The cloud development container has Node 22, and C1 could only be built with a Node 26 downloaded for one session. Choose one:
+21. **Node 26 in every environment. Needed before C2.** **Answered 2026-11-18:** option (b): in cloud sessions the session-start hook installs Node 26.13.1 from nodejs.org, checks its checksum, caches it and writes PATH to `$CLAUDE_ENV_FILE`; `nvm use` with `.nvmrc` on developer machines, `actions/setup-node` with `node-version-file: .nvmrc` in CI; release-manager writes the hook change and the owner merges it (DECISIONS.md). `engineStrict` refuses any Node outside `>=26.13.1 <27`. The cloud development container has Node 22, and C1 could only be built with a Node 26 downloaded for one session. Choose one:
     - (a) pnpm's `devEngines.runtime` (`node` 26.13.1, `onFail: "download"`) in the root `package.json`, so pnpm fetches the pinned Node on every machine and in CI.
     - (b) `.claude/hooks/session-start.sh` installs Node 26.13.1 in cloud sessions only. Developer machines use `.nvmrc`, and CI uses `actions/setup-node` with `node-version-file: .nvmrc`.
     - (c) Both.
@@ -1230,7 +1233,7 @@ A new endpoint without its roles, rate limits or idempotency note then fails CI.
     **Test of (a), 2026-11-18,** with Node 22.23.5 on PATH, a package.json pinned to pnpm 12.21.0 and `devEngines.runtime` node 26.13.1 with download. pnpm 12.21.0 supports the field: it resolved `node@runtime:26.13.1`. But `pnpm install` failed with exit code 1: to write checksums for every platform into the lockfile, pnpm also fetches `https://unofficial-builds.nodejs.org/download/release/v26.13.1/SHASUMS256.txt` (the musl builds), and this environment's network refuses that host. Limiting `supportedArchitectures` did not avoid the fetch. The Node mirror setting is read only from the global pnpm config or environment, not from `pnpm-workspace.yaml`. After the failed install, `pnpm exec node -v` printed a warning, then ran **v22.23.5** and exited 0. So when the runtime download fails, `pnpm exec` falls back to the system Node with only a warning, and exits 0. A plain download from nodejs.org works here: `pnpm env use --global 26.13.1` fetched 26.13.1 and ran it. The successful path of (a) could not be shown from here.
 
     **Recommendation: (b).** It fixes the one environment that lacks Node 26, without depending on a host this environment refuses. It leaves `package.json` and the lockfile alone. The hook downloads the Linux x64 build from nodejs.org, checks its SHA-256 against `SHASUMS256.txt`, unpacks it outside the repository, and puts it first on PATH for the session. It reads the version from `.nvmrc`, and like today's hook it never fails the session start: the download has a timeout, and the unpacked Node is cached so later sessions reuse it. A SessionStart hook runs in a child process, so changing PATH there does not reach the session; the hook keeps PATH for the session by writing it to `$CLAUDE_ENV_FILE`. **Not yet shown: the hook itself.** The pull request that adds it must show `node -v` printing 26.13.1 in a new cloud session. Revisit (a) if the cloud network allows `unofficial-builds.nodejs.org`. Option (a) or (c) changes the root `package.json`, so release-manager would make it in a small follow-up pull request that you merge. Option (b) changes `.claude/`, so it also goes in a small pull request that you merge, with release-manager proposed as its writer.
-22. **Add `@eslint/js` 10.0.1** to the root dev dependencies (section 18.1). It turns on ESLint's own recommended rules (`js.configs.recommended`) in `eslint.config.mjs`. Today only typescript-eslint's recommended rules run. It is a new dependency, so it needs your approval. If you approve, release-manager adds it in a small root-tooling pull request.
+22. **Add `@eslint/js` 10.0.1** to the root dev dependencies (section 18.1). **Answered 2026-11-18:** approved, with `js.configs.recommended` turned on; release-manager adds it (DECISIONS.md). It turns on ESLint's own recommended rules (`js.configs.recommended`) in `eslint.config.mjs`. Today only typescript-eslint's recommended rules run. It is a new dependency, so it needs your approval. If you approve, release-manager adds it in a small root-tooling pull request.
 
 ## 23. Traceability
 
@@ -1250,7 +1253,7 @@ A new endpoint without its roles, rate limits or idempotency note then fails CI.
 
 ## 24. Proposed decisions, awaiting the owner
 
-These are the architect's proposals of 2026-11-18. None is in `docs/DECISIONS.md` yet, because that file holds only decisions the owner has made. Each entry says how it is decided. "With this document" means approving this document approves it; "question N" means it is decided by the answer to that question in section 22. Once decided, each entry moves to `docs/DECISIONS.md` with the date of the owner's answer.
+These are the architect's proposals of 2026-11-18. Only entries marked "Decided" are in `docs/DECISIONS.md`, because that file holds only decisions the owner has made. Each entry says how it is decided. "With this document" means approving this document approves it; "question N" means it is decided by the answer to that question in section 22. Once decided, each entry moves to `docs/DECISIONS.md` with the date of the owner's answer.
 
 ### 24.1 Versions pinned for S0 and S1 (with this document)
 
@@ -1261,6 +1264,8 @@ Node 26.13.1, pnpm 12.21.0, TypeScript 6.0.3, ESLint 10.15.0, PostgreSQL 18.7, R
 The API, both websites, the shared packages and qa-tester's test packages form one pnpm workspace with one lockfile and exact versions. Flutter stays outside it and reads the tokens through a path dependency. Turborepo or Nx can be added later without moving folders. A shared web component package is created only when both websites need it. Root files and every CI job belong to release-manager; only one open pull request touches the lockfile at a time.
 
 ### 24.3 NestJS 12 on Node 26 LTS, with TypeScript 6.0 (with this document); Vitest (question 4)
+
+**Vitest: Decided 2026-11-18, see DECISIONS.md.** The rest of this entry is decided with this document.
 
 NestJS 12 on Express, as ES modules, on Node 26, the active LTS release. Vitest 4 for tests, as NestJS 12's own template uses, because Jest is awkward with ES modules. Vitest replaces a line in STACK.md, so it waits for question 4; the Jest fallback list is in section 18.7.
 
@@ -1330,8 +1335,12 @@ Option A, DigitalOcean in Frankfurt, recommended over Hetzner (cheapest, most wo
 
 ### 24.20 Node 26 in cloud sessions through the session-start hook (question 21)
 
+**Decided 2026-11-18, see DECISIONS.md.**
+
 Option (b): `.claude/hooks/session-start.sh` installs the Node version in `.nvmrc` from nodejs.org, checked against its SHA-256, in cloud sessions only. Developer machines use `.nvmrc`, CI uses `actions/setup-node` with `.nvmrc`, and the Docker images pin Node themselves. The hook keeps PATH for the session through `$CLAUDE_ENV_FILE`, uses a download timeout and caches the unpacked Node, so it never fails the session start. Not yet shown: the hook itself; its pull request must show `node -v` printing 26.13.1 in a new cloud session. pnpm's `devEngines.runtime` download was tested and is not used for now: in this environment `pnpm install` fails on the musl checksum host, and `pnpm exec` then runs with the system Node. Needed before C2.
 
 ### 24.21 ESLint's core recommended rules through `@eslint/js` 10.0.1 (question 22)
+
+**Decided 2026-11-18, see DECISIONS.md.**
 
 Add `@eslint/js` 10.0.1, the newest 10.x, whose peer range covers ESLint 10.15.0, and extend `js.configs.recommended` before typescript-eslint's recommended set in `eslint.config.mjs`.

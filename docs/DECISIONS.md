@@ -2,6 +2,18 @@
 
 A running log of decisions, newest first. Add an entry whenever something significant is decided, so it is not argued again. Each entry says what was decided and why.
 
+## 2026-11-18: Vitest instead of Jest
+
+The API, website and contract tests use Vitest, not the Jest that `docs/STACK.md` listed. NestJS 12's own project template uses ES modules and Vitest, and Jest needs its experimental ES module mode to run NestJS 12; Vitest's test syntax is almost the same as Jest's. The exact versions are in `docs/ARCHITECTURE.md` section 18. Replaces Jest in the Testing row of `docs/STACK.md`. Decided by the owner.
+
+## 2026-11-18: Node 26 through the session hook, nvm and setup-node
+
+Node 26.13.1 reaches every environment without changing `package.json`. In cloud sessions, `.claude/hooks/session-start.sh` installs Node 26.13.1 from nodejs.org, checks its SHA-256 checksum, caches the unpacked Node for later sessions and writes PATH to `$CLAUDE_ENV_FILE`, so it applies to the whole session. Developer machines run `nvm use`, which reads `.nvmrc`. CI uses `actions/setup-node` with `node-version-file: .nvmrc`. The Docker images pin Node themselves. The cloud container has Node 22, and pnpm's own Node download (`devEngines.runtime`) failed there because it also fetches checksums from a host the cloud network refuses, so this fixes the one environment that lacks Node 26 with tools that already work everywhere else. Release-manager writes the hook change, and the owner merges it. Decided by the owner.
+
+## 2026-11-18: Add @eslint/js
+
+`@eslint/js` 10.0.1 is added to the root dev dependencies, and `eslint.config.mjs` turns on `js.configs.recommended` before typescript-eslint's recommended rules. Until now only typescript-eslint's rules ran, so ESLint's own core checks (such as `no-const-assign` and `no-debugger`) were off. Since ESLint 10 the package is released separately from `eslint`; 10.0.1 is the newest 10.x and its peer range covers ESLint 10.15.0. Release-manager adds it in a small root-tooling pull request. Decided by the owner.
+
 ## 2026-11-18: Two-tier merging
 
 The owner merges documents, decisions, the API contract, migrations and data-model changes, any dependency change, sign-in and security code, anything under `.github/**` or that decides which CI checks run, and anything released to testers or stores. The main Claude session merges plain build increments that only implement what is already approved and fall under none of those, once CI is green and required on `main` (enforced for administrators), the reviewer approves with no open findings and marks the pull request auto-merge eligible, and qa-tester passes. It then posts a summary for the owner. The exact rule is in `CLAUDE.md`. All agents act through the owner's GitHub account, so no agent's approval is an independent check; only one actor merges, so it can be held to the conditions. This keeps the owner on every decision without making them the bottleneck for each small build step. Auto-merge starts after CI exists (C3) and the owner has turned on required status checks for `main`, enforced for administrators. Decided by the owner; the inclusion of all `.github/**` changes in the owner's list was added in review and is confirmed by the owner merging this entry.
