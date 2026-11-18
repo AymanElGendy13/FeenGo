@@ -10,7 +10,7 @@ Fixed inputs, already decided:
 
 - The name is **FeenGo**, always with a capital G. "Feen" means "where" in Egyptian Arabic, so the name reads "where to go?".
 - English is the primary and default language. Arabic is a full second language, laid out right to left. Screens are designed in English first and checked in Arabic every time.
-- Table reservations are for restaurants, cafes and upscale places that take reservations (instant booking). Events such as birthdays, engagements and corporate events are request-for-quote.
+- Table reservations are for restaurants, cafes and upscale places that take reservations (instant booking), as stated by the owner on 2026-11-18, in conversation. The PRD and `docs/DECISIONS.md` do not yet say this. Events such as birthdays, engagements and corporate events are request-for-quote (`docs/DECISIONS.md`, "Two booking flows").
 - Visual designs and the logo are made and approved by the owner outside the repository, for example in Figma. They are then exported into `docs/design/`.
 - The provisional tokens in `docs/ROADMAP.md` are used until the design system is approved. They are replaced later by a single edit in `packages/design-tokens`.
 
@@ -133,7 +133,7 @@ Three distinct directions, described in words so the owner can react before any 
 
 - **Mood:** energetic, young, social. Plans with friends, celebration, the city at night.
 - **Colour:** one saturated hero colour (for example electric coral or violet) with a bright secondary colour, bold colour blocks, and a confident dark mode as a signature.
-- **Typography:** a geometric sans with character in heavy headline weights. Alexandria, by Egyptian type designer Mohamed Gaber, is a natural fit (section 6).
+- **Typography:** a geometric sans with character in heavy headline weights. Alexandria is a natural fit. Its Arabic is by Egyptian type designer Mohamed Gaber and its Latin by Julieta Ulanovsky (section 6).
 - **Imagery:** candid, flash-lit photos of groups and celebrations, plus a small set of illustrated "stickers" for occasions (cake, ring, briefcase).
 - **Iconography:** chunky rounded icons, filled or duotone, with pill shapes and large radii (20 px or more).
 - **Strengths:** memorable, social and shareable. Strong appeal to the 18 to 30 group.
@@ -179,7 +179,7 @@ The owner also confirms how the name appears under the app icon and in the Arabi
 
 ### Requirements for the symbol
 
-- Recognisable at 16 px (browser tab), 24 dp in a single colour (Android notification icon), 29 pt (smallest iOS icon) and 48 dp (Android launcher).
+- Recognisable at 16 px (browser tab), 24 dp in a single colour (Android notification icon), 20 pt (smallest iOS icon, used for notifications) and 48 dp (Android launcher).
 - No text and no wordmark inside the app icon.
 - No hairlines. Strokes must survive being reduced to 16 px.
 - Works in full colour, in one colour, reversed on dark, and as a silhouette (Android themed icons, iOS tinted icons).
@@ -253,7 +253,7 @@ The ROADMAP sets IBM Plex Sans Arabic for both languages. That font contains Ple
 
 Also considered:
 
-- **Alexandria** (OFL, variable 100 to 900, Arabic and Latin, `tnum` available, by Egyptian designer Mohamed Gaber). A strong display or brand face for direction C, or for headlines in A.
+- **Alexandria** (OFL, variable 100 to 900, Arabic and Latin, `tnum` available, Arabic by Egyptian designer Mohamed Gaber, Latin by Julieta Ulanovsky). A strong display or brand face for direction C, or for headlines in A.
 - **Cairo** (OFL, variable 200 to 1000). Very widely used in the region, so less distinctive. No `tnum`.
 - **Tajawal** (OFL, 7 weights). Small character set and no `tnum`. Not recommended.
 - **Commercial Arabic families** from specialist foundries are an option for a more distinctive brand. They need paid app and web embedding licences, so compare the cost before choosing.
@@ -277,7 +277,7 @@ Also considered:
 
 ## 8. Provisional palette review
 
-Measured with the WCAG 2.x formula. These figures match the owner's measurements.
+Measured with the WCAG 2.x formula. These figures were recomputed by the designer and the reviewer.
 
 | Pair | Ratio | Body text (4.5) | Large text and UI parts (3.0) |
 | --- | --- | --- | --- |

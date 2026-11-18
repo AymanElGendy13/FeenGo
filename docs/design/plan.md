@@ -113,7 +113,7 @@ The count is an estimate of distinct screens. Sheets and dialogs that need their
 | --- | --- | --- |
 | App | Home: categories, occasions, featured, near you | C-05 |
 | App | Location explainer before the permission prompt, plus an area picker when permission is denied | C-05 |
-| App | Search: input, recent searches, suggestions. **Owner proposal, beyond C-06:** also match Franco-Arabic spellings. | C-06 |
+| App | Search: input, recent searches, suggestions. **Proposal for the owner, beyond C-06:** also match Franco-Arabic spellings. | C-06 |
 | App | Results list | C-06 |
 | App | Results map | C-06 |
 | App | Filters sheet: area, category, cuisine, price, occasion, open now | C-06 |
@@ -124,7 +124,7 @@ The count is an estimate of distinct screens. Sheets and dialogs that need their
 | App | Reviews list (read-only, empty until S7) | C-07 |
 | App | Cancellation policy explainer sheet | C-07 |
 | App | Hours and location detail, with a link out for directions | C-07 |
-| App | Share. **Owner proposal, beyond C-08:** a small web fallback page for shared links when the app is not installed, instead of sending people straight to the store. | C-08 |
+| App | Share. **Proposal for the owner, beyond C-08:** a small web fallback page for shared links when the app is not installed, instead of sending people straight to the store. | C-08 |
 | Admin | Featured venues: list and schedule | A-06 |
 | Admin | Featured slot editor: venue, start and end dates | A-06 |
 
@@ -242,10 +242,13 @@ S4 is the heaviest slice. **Owner question:** allow S4 specs to start during S2,
 | Home | Categories, occasions, featured, near you. The entry point to "plan an event". | S3 (placeholder until then) |
 | Search | Search, filters, list and map | S3 |
 | Bookings | Tables and event requests together, upcoming and past. Visitors see a sign-in prompt. | S4 |
-| Account | Profile, language, appearance, payments (S6), referral and help (S7), legal, sign out, delete account | S1 |
+| Account | Profile, language, appearance (if the owner wants it), payments (S6), referral and help (S7), legal, sign out, delete account | S1 |
 
 - The tab bar mirrors in Arabic: Home sits at the far right.
-- S1 ships the bar with only Home (placeholder) and Account. Search and Bookings appear in the slices that fill them. An empty tab is never shown.
+- Search and Bookings appear in the slices that fill them. An empty tab is never shown.
+- **S1 and S2: two options for the owner.** Platform guidance puts a tab bar at 3 to 5 destinations, so a bar with only Home and Account is weak.
+  - Option 1: no tab bar in S1 and S2. An Account button sits in the end corner of the Home header. The tab bar arrives in S3 with Home, Search and Account, and Bookings joins in S4. **Recommended.**
+  - Option 2: a two-tab bar (Home, Account) from S1.
 - Events do not get a tab. They start from Home (occasion tiles) and from the venue page. **Owner question:** if events are central to the business, a fifth tab "Events" is the alternative.
 - No "Saved" or "Favourites" tab, because the PRD has no such requirement.
 - A tab bar is the platform convention on both iOS and Android (Material navigation bar). One shared design is used on both, with platform-specific back gestures and system sheets.
@@ -287,7 +290,7 @@ S0 needs no brand decisions, no logo and no navigation approval.
 
 | Slice | Must have build approval before code starts |
 | --- | --- |
-| S1 | App: phone entry, code entry, complete profile, sign-in prompt, account, edit profile, language, appearance, delete account, account deleted, legal pages. Admin: sign-in, second step, second-step setup, shell, activity log, log detail. Also the S1 part of the navigation (Account tab) and owner decisions 4 to 6 in section 6 (Arabic digits, voice, provisional Arabic name). |
+| S1 | App: phone entry, code entry, complete profile, sign-in prompt, account, edit profile, language, appearance (only if section 6, decision 3 is yes), delete account, account deleted, legal pages. Admin: sign-in, second step, second-step setup, shell, activity log, log detail. Also the S1 part of the navigation (where Account lives, section 3) and owner decisions 5 to 7 in section 6 (Arabic digits, voice, provisional Arabic name). |
 | S2 | All S2 dashboard and admin screens, and the dashboard and admin navigation |
 | S3 | All S3 screens, and the full app navigation (expensive to change after this slice) |
 | S4 | All S4 screens and message templates, and the status colour, icon and label set for bookings |
@@ -345,18 +348,27 @@ Logo masters and app-icon source files need a home. They do not belong in `docs/
 
 ## 6. Decisions the owner needs to make first, in order
 
-1. Confirm the two-layer approval (build approval now, visual approval before the public release). Everything else depends on it.
-2. Approve the S0 placeholder spec, including the first-launch language rule.
-3. Choose the design tool (Figma or Penpot), where designs live and who has access.
-4. Arabic digits in Arabic screens: Western or Arabic-Indic. Needed for S1.
-5. Arabic voice and gender-neutral copy. Needed for S1.
-6. A provisional Arabic name. Needed for S1 testers. Final before the public release.
-7. Approve the app navigation proposal, at least the Account tab for S1 and the events question.
-8. Brand personality: answers to the questions in `brief.md` section 2.
-9. Visual direction A, B or C.
-10. Who designs the logo, and approval of the logo brief.
-11. Typography pairing.
-12. Final palette, which comes in phase 4.
+1. **Confirm the two-layer approval** (build approval now, visual approval before the public release). Everything else depends on it. It changes three statements in `docs/ROADMAP.md`:
+
+   | ROADMAP today | Under the split it becomes |
+   | --- | --- |
+   | "How design fits": "The design system and the app's main navigation are designed once, at the start." | The app's main navigation is designed at the start and fixed by S3. The design system is designed in phase 4, alongside the build, and replaces the provisional tokens with one edit. It is not needed before building starts. |
+   | "How design fits": "A slice's feature code does not start until its screens are approved." | A slice's feature code does not start until its screens have **build approval** (structure, states, copy in both languages, right-to-left, accessibility). Visual approval can come later. |
+   | "When a slice is done", step 1: "Its screens are designed and approved in Arabic and English." | Its screens have build approval in English and Arabic, and are built to match. **Visual approval** of all shipped screens is required before the first public release after S6, not for each slice. |
+
+   Only after the owner approves will a `docs/DECISIONS.md` entry and a `docs/ROADMAP.md` edit follow. Until then the ROADMAP wording stands.
+2. **Approve the S0 placeholder spec,** including the first-launch language rule, and saving the language choice in S0 (C-03 groundwork brought forward from S1).
+3. **In-app appearance control.** Neither the ROADMAP nor the PRD asks for one. S0 follows the phone's light or dark setting only, which still proves both themes. Should the app also offer a System, Light and Dark choice from S1? If yes, it becomes the S1 "Appearance setting" screen, with no PRD ID.
+4. **Choose the design tool** (Figma or Penpot), where designs live and who has access.
+5. **Arabic digits** in Arabic screens: Western or Arabic-Indic. Needed for S1.
+6. **Arabic voice** and gender-neutral copy. Needed for S1.
+7. **A provisional Arabic name.** Needed for S1 testers. Final before the public release.
+8. **App navigation proposal:** where Account lives in S1 and S2 (header button or two-tab bar), and the events question.
+9. **Brand personality:** answers to the questions in `brief.md` section 2.
+10. **Visual direction** A, B or C.
+11. **Logo:** who designs it, and approval of the logo brief.
+12. **Typography pairing.**
+13. **Final palette,** which comes in phase 4.
 
 ---
 
@@ -371,3 +383,5 @@ These come from the project documents. None of them blocks S0. Each one needs an
 5. **Reviews on the venue page before S7** (before S3). C-07 shows rating and reviews from S3, but reviews only exist from S7. The venue page hides the rating until a venue has reviews, and shows a short note instead.
 6. **Language preference after sign-in** (before S1). C-18 sends notifications in the chosen language, so the language chosen on the phone must also be stored on the account. The architect confirms this in the API.
 7. **Installable partner dashboard** (before S2). See section 3.
+8. **"Awaiting deposit" before payments exist** (before S5). In S5 a customer can accept a quote, which moves the booking to Awaiting deposit, but paying the deposit (C-16) only arrives in S6. What do testers see at that status in S5, and does it expire after the usual time?
+9. **Appearance control** (before S1). See section 6, decision 3.
