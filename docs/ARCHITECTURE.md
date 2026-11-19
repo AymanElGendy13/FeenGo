@@ -110,7 +110,7 @@ FeenGo/
 
 **Every CI job is written by release-manager.** For each increment, section 3 names whether the job arrives in the same pull request (release-manager adds it as a second owner, touching only `.github/`) or in a follow-up pull request.
 
-**One lockfile change at a time.** Only one open pull request may touch `pnpm-lock.yaml` at a time. The strictly sequential increments in section 3 already give this; it also applies to dependency-update pull requests, which wait while a feature pull request changes the lockfile.
+**One lockfile change at a time.** Only one open pull request may touch `pnpm-lock.yaml` at a time. The one-at-a-time increments in section 3 already give this; it also applies to dependency-update pull requests, which wait while a feature pull request changes the lockfile.
 
 **qa-tester's files live in `tests/`**, so qa-tester never edits another owner's folder. `tests/contract` and `tests/e2e/web` are workspace packages with their own dependencies (section 18.6). Maestro flows in `tests/e2e/mobile` find widgets by keys that mobile-dev adds; the list of keys is agreed in writing in the screen spec before the flow is written. Unit, widget and golden tests stay in each app and belong to that app's owner.
 
@@ -125,7 +125,7 @@ FeenGo/
 
 ## 3. S0 increments C1 to C11
 
-Each increment is one pull request that builds, tests and can be merged alone. **The increments are built strictly in this order: each one is merged before the next one starts** (ROADMAP.md). Only design specs and documents for the next slice may be prepared alongside.
+Each increment is one pull request that builds, tests and can be merged alone. **The increments are built in this order: each one is merged before the next one starts** (ROADMAP.md). When an increment is blocked on an owner answer, the next increment that is not blocked may go first, still one at a time (DECISIONS.md, 2026-11-19). In S0 that puts C8 and C9 before C6 and C7, which wait on questions 11 and 12. Only design specs and documents for the next slice may be prepared alongside.
 
 | Inc. | Pull request | Owner | CI job, written by release-manager | What proves it |
 | --- | --- | --- | --- | --- |
