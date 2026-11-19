@@ -10,6 +10,8 @@
 // The plural and select options inside them are not compared, because Arabic has
 // more plural forms than English (zero, one, two, few, many, other).
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export interface MessageFile {
   name: string;
@@ -262,8 +264,8 @@ function describe(placeholders: string[]): string {
 /** Reads one messages file from the app's messages/ folder. */
 export function readMessageFile(locale: string): MessageFile {
   const name = `messages/${locale}.json`;
-  const url = new URL(`../${name}`, import.meta.url);
-  return { name, content: JSON.parse(readFileSync(url, 'utf8')) as unknown };
+  const appFolder = join(dirname(fileURLToPath(import.meta.url)), '..');
+  return { name, content: JSON.parse(readFileSync(join(appFolder, name), 'utf8')) as unknown };
 }
 
 /** Compares the Arabic file against the English one, which is the reference. */
