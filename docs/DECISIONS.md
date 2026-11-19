@@ -2,6 +2,10 @@
 
 A running log of decisions, newest first. Add an entry whenever something significant is decided, so it is not argued again. Each entry says what was decided and why.
 
+## 2026-11-19: Security override for style-dictionary's glob
+
+style-dictionary 5.8.0 reaches `glob` 13.0.7 and `minimatch` 10.2.6 through `@bundled-es-modules/glob`, both with medium advisories (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249) that fail CI's dependency scan, and no fixed version exists in the ranges it asks for. A scoped pnpm override pins `glob` to 14.0.6 under `@bundled-es-modules/glob` only, which also brings `minimatch` 11. It adds no new package, the token outputs are byte-identical, and the scan stays as strict as before. It is removed once `@bundled-es-modules/glob` depends on a fixed glob, or style-dictionary stops using it. Decided by the owner (ARCHITECTURE question 23).
+
 ## 2026-11-18: Vitest instead of Jest
 
 The API, website and contract tests use Vitest, not the Jest that `docs/STACK.md` listed. NestJS 12's own project template uses ES modules and Vitest, and Jest needs its experimental ES module mode to run NestJS 12; Vitest's test syntax is almost the same as Jest's. The exact versions are in `docs/ARCHITECTURE.md` section 18. Replaces Jest in the Testing row of `docs/STACK.md`. Decided by the owner.
