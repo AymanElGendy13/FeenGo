@@ -62,6 +62,32 @@ The S0 placeholder home keeps its app name and welcome line. Its language contro
 | S1-Q3 | Does signing in mean accepting the terms of use and privacy policy, shown as a line under the button? Or must the customer tick a box? Is the accepted version recorded? This is a lawyer question too. | Phone entry, legal pages | A line with links, nothing recorded |
 | S1-Q4 | Where does a suspended customer (`ACCOUNT_SUSPENDED`, from S2) or a customer with a problem go before the help screen arrives in S7 (C-20)? | Phone entry, code entry | The message names no contact |
 
+## Gap list: PRD, architecture and contract
+
+Gaps found while writing these specs. They are recorded here for the architect and the owner, and not fixed in these specs. Where a spec needs an answer, it says what it assumes.
+
+| # | Gap | Specs affected | For |
+| --- | --- | --- | --- |
+| G1 | `plan.md` lists "second-step setup on first sign-in" for admins. The architecture enrols the authenticator by a server command, and no endpoint exists for it, so there is no setup screen. | README | Owner, architect |
+| G2 | There is no admin password reset. `docs/ARCHITECTURE.md` section 9.2 has `admin:reset-totp`, `admin:unlock` and `admin:disable`, but no command to reset a forgotten password. | Admin sign-in | Architect |
+| G3 | What a disabled admin gets at the password step is not defined. `POST /v1/admin/auth/sign-in` declares no `403 ADMIN_DISABLED`; only the second step does. | Admin sign-in, authenticator code | Architect |
+| G4 | When `proxy.ts` sends an admin to sign-in, the page is not told why (signed out or session ended), nor where to return. These specs propose `reason` and `from`. | Admin signed out | Architect, web-dev |
+| G5 | `TOTP_INVALID`'s `attemptsRemaining` counts tries left on the `mfaToken` (3). The lock counts wrong passwords and codes per email (5). An admin can be told "1 try left" and then be locked, or locked with tries "left". | Authenticator code | Architect |
+| G6 | No endpoint lists admins, so the activity log cannot offer an admin picker for `actorAdminId`. These specs filter by clicking a name instead. | Activity log | Architect |
+| G7 | No endpoint returns one activity log entry, so an entry cannot be linked to directly. Also, `ActivityLogEntry` leaves out the `ip_address` and `request_id` that the table stores "for security review". | Activity log entry | Architect |
+| G8 | For `admin.sign_in_failed` and `admin.locked`, who the actor is (the admin whose email was used, who may not be the person trying) is not defined, so "Who" may mislead. | Activity log | Architect |
+| G9 | No endpoint exposes `auth.otp.allowed_country_codes`. If Q7 is answered "more countries", the phone field cannot know which countries to offer. | Phone entry | Architect |
+| G10 | When the language on the phone and the account's `language` differ at sign-in, nothing says which wins, or how a failed language update is retried. These specs propose: the phone wins and the app retries. Related to plan section 7, question 6. | Code entry, language setting | Architect |
+| G11 | `OtpChallenge` gives only absolute times, and the contract declares no server time header. A phone with a wrong clock shows wrong countdowns. Durations in seconds, or a declared `Date` header, would fix it. | Code entry | Architect |
+| G12 | No automatic code autofill method is chosen for Android (SMS User Consent, SMS Retriever, or WhatsApp one-tap). Each needs a library and changes to the message templates. | Code entry | Architect |
+| G13 | `FieldError.code` is free text with examples, not an enum, and the mapping from validation to codes is still open (`docs/ARCHITECTURE.md` section 4.7). Clients cannot be sure every field error has a translation. | Complete profile, edit profile, admin sign-in | Architect |
+| G14 | A customer cannot change their phone number (not in C-04 or the contract). A new number means deleting the account and starting again. | Edit profile | Owner |
+| G15 | The email's purpose is not stated (S1-Q2), and it is not verified in S1. | Complete profile, edit profile | Owner |
+| G16 | A-09 mentions versions of "the terms", but no requirement says customers accept terms, nothing records it in S1, and the architecture does not say where the legal pages live (S1-Q3). | Phone entry, legal pages | Owner, lawyer, architect |
+| G17 | Confirming before deletion uses the normal code check, which starts a second session on the same phone. If the person then cancels, the first session stays open until it expires. | Delete account | Architect |
+| G18 | `docs/ARCHITECTURE.md` section 23 tests C-01 by "opening the profile". Account must stay open to visitors for the language setting (C-03), so in these specs the protected S1 screens are edit profile and delete account. The C-01 test should name them. Q19 covers the rest. | Sign-in prompt, account | Architect, qa-tester |
+| G19 | If a lawyer says analytics needs consent (Q6), S1 needs a consent screen that is not in the inventory. | Phone entry | Owner, lawyer |
+
 ## Shared patterns
 
 Every screen uses these. Each spec refers to them by name rather than repeating them.
@@ -136,7 +162,7 @@ No screen states a fixed number of minutes, tries or seconds. They are settings 
 | Tries left | `attemptsRemaining` with `OTP_INVALID` or `TOTP_INVALID` |
 | Lock or wait time | `retryAfterSeconds` (or `Retry-After`) with `OTP_LOCKED`, `OTP_RESEND_TOO_SOON`, `RATE_LIMITED`, `ADMIN_SIGN_IN_LOCKED` |
 
-Countdowns run from when the response arrived, using the gap between the server time and the phone's clock, so a wrong phone clock does not break them (see the gap list: the contract does not declare a server time header).
+Countdowns run from when the response arrived, using the gap between the server time and the phone's clock, so a wrong phone clock does not break them (gap G11: the contract does not declare a server time header).
 
 Durations use these keys, with ICU plurals. Arabic has six plural forms.
 
@@ -159,7 +185,7 @@ Waits of 60 seconds or more are rounded up to whole minutes. Countdowns under on
 | `400 VALIDATION_FAILED` that the screen cannot map to a field | `error.VALIDATION_FAILED` | Something here isn't right. Check it and try again. | توجد بيانات غير صحيحة. يُرجى مراجعتها والمحاولة مرة أخرى. |
 | `403 FORBIDDEN` | `error.FORBIDDEN` | This account can't do that. | لا يمكن تنفيذ هذا الإجراء بهذا الحساب. |
 | `403 ACCOUNT_SUSPENDED` | `error.ACCOUNT_SUSPENDED` | This account is suspended, so it can't sign in. | هذا الحساب موقوف، لذلك لا يمكن تسجيل الدخول به. |
-| A code the app does not know | `error.UNKNOWN` | Something went wrong. Try again. | حدث خطأ ما. يُرجى المحاولة مرة أخرى. |
+| A code the app does not know (client fallback, not an API code) | `common.error.unknown` | Something went wrong. Try again. | حدث خطأ ما. يُرجى المحاولة مرة أخرى. |
 | Any retry button | `common.action.retry` | Try again | إعادة المحاولة |
 
 `UNAUTHENTICATED` is never shown as a message. The app refreshes once and retries. If the refresh fails with `REFRESH_TOKEN_INVALID`, `REFRESH_TOKEN_REUSED` or `ACCOUNT_SUSPENDED`, the person is signed out, as `sign-in-prompt.md` describes.
