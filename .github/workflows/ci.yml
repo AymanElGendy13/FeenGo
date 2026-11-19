@@ -1,8 +1,8 @@
 # FeenGo CI (docs/ARCHITECTURE.md section 21).
 #
 # Every push to any branch and every pull request runs every job, with no path
-# filters, until the owner answers question 16. Jobs for the websites, the design
-# tokens and the app arrive with the increments that create them (section 3).
+# filters, until the owner answers question 16. Jobs for the websites and the app
+# arrive with the increments that create them (section 3).
 #
 # Branch protection requires one check only: "CI passed (pull_request)" (job
 # ci-summary on a pull request), which fails unless every other job succeeded.
@@ -235,12 +235,61 @@ jobs:
         with:
           args: --allow-no-lockfiles=false --lockfile=./pnpm-lock.yaml
 
+  design-tokens:
+    name: Design tokens (tests, build, contrast check, stale outputs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm (version from packageManager)
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # The package and its dependencies only.
+      - name: Install (design tokens only)
+        run: pnpm install --frozen-lockfile --filter @feengo/design-tokens...
+
+      - name: Tests
+        run: pnpm --filter @feengo/design-tokens test
+
+      # Style Dictionary writes dist/ and flutter/lib/, and the build fails when a
+      # declared text and background pair is below WCAG AA (section 13).
+      - name: Build (includes the contrast check)
+        run: pnpm --filter @feengo/design-tokens build
+
+      # The generated outputs are committed (section 13), so a fresh build must
+      # leave the package exactly as committed: no changed, deleted or new file.
+      # The second check catches outputs that a .gitignore pattern hides from
+      # git status (the root .gitignore ignores every dist/ folder).
+      - name: Check the committed outputs are up to date
+        run: |
+          changes="$(git status --porcelain --untracked-files=all -- packages/design-tokens)"
+          hidden="$(git ls-files --others --ignored --exclude-standard -- \
+            packages/design-tokens/dist packages/design-tokens/flutter/lib)"
+          if [ -n "$changes" ] || [ -n "$hidden" ]; then
+            echo "Changed or new files after the build:"
+            printf '%s\n' "$changes" "$hidden" | sed '/^$/d'
+            git diff --stat -- packages/design-tokens
+            echo "::error::The committed design-token outputs are stale. Run 'pnpm --filter @feengo/design-tokens build' and commit everything it changes in packages/design-tokens."
+            exit 1
+          fi
+          echo "Committed outputs match the build."
+
   ci-summary:
     name: CI passed (${{ github.event_name }})
     if: always()
     # Every job in this workflow must be listed here, or its failure would not
     # block the merge.
-    needs: [api, contract, security]
+    needs: [api, contract, design-tokens, security]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
