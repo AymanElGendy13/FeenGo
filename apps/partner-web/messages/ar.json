@@ -1,0 +1,21 @@
+{
+  "partner": {
+    "app": {
+      "name": "FeenGo للشركاء"
+    }
+  },
+  "home": {
+    "placeholder": {
+      "welcome": "أهلًا وسهلًا. أماكن للأكل والسهر والاحتفال قريبًا."
+    }
+  },
+  "settings": {
+    "language": {
+      "title": "اللغة",
+      "option": {
+        "en": "English",
+        "ar": "العربية"
+      }
+    }
+  }
+}

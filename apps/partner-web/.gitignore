@@ -1,0 +1,10 @@
+# Next.js: build output and the type file it regenerates on every dev and build run.
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# Playwright: run output, and the screenshots taken for design review. The
+# screenshots are not golden images and are never committed.
+test-results/
+playwright-report/
+screenshots/
