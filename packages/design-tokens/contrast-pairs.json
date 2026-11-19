@@ -1,0 +1,47 @@
+{
+  "$description": "Colour pairs the contrast check tests in every theme (docs/ARCHITECTURE.md section 13). WCAG 2.x AA: 4.5 to 1 for text, 3 to 1 for large text and interface parts. A pair's minimum may be raised but never set below the WCAG minimum for its kind.",
+  "pairs": [
+    {
+      "foreground": "onSurface",
+      "background": "surface",
+      "kind": "text",
+      "minimum": 4.5,
+      "usedFor": "Body text, titles, unselected labels"
+    },
+    {
+      "foreground": "brandText",
+      "background": "surface",
+      "kind": "largeText",
+      "minimum": 3,
+      "usedFor": "App name"
+    },
+    {
+      "foreground": "onSelected",
+      "background": "selected",
+      "kind": "text",
+      "minimum": 4.5,
+      "usedFor": "Label on a selected fill"
+    },
+    {
+      "foreground": "selected",
+      "background": "surface",
+      "kind": "interface",
+      "minimum": 3,
+      "usedFor": "Selected state against the screen"
+    },
+    {
+      "foreground": "outline",
+      "background": "surface",
+      "kind": "interface",
+      "minimum": 3,
+      "usedFor": "Control edge against the screen"
+    },
+    {
+      "foreground": "focus",
+      "background": "surface",
+      "kind": "interface",
+      "minimum": 3,
+      "usedFor": "Focus ring against its gap"
+    }
+  ]
+}

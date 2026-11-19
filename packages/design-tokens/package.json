@@ -1,0 +1,23 @@
+{
+  "name": "@feengo/design-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FeenGo design tokens: the one source of colours, type, spacing, radius and motion for the app and both websites.",
+  "type": "module",
+  "engines": {
+    "node": ">=26.13.1 <27"
+  },
+  "exports": {
+    "./tokens.css": "./dist/css/tokens.css",
+    "./tokens": "./dist/ts/tokens.ts",
+    "./fonts/*": "./fonts/*"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check:contrast": "node scripts/check-contrast.mjs",
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "devDependencies": {
+    "style-dictionary": "5.8.0"
+  }
+}
