@@ -34,7 +34,8 @@ minimumReleaseAgeExclude:
 
 # Security override (C5): style-dictionary 5.8.0 reaches glob 13.0.7 and minimatch 10.2.6
 # through @bundled-es-modules/glob, both with known vulnerabilities (GHSA-3g3m-2fjr-6pw4,
-# GHSA-g3hv-75wg-m249). glob 14.0.6 fixes both and brings minimatch 11. Remove this once
-# style-dictionary ships a fixed glob.
+# GHSA-g3hv-75wg-m249). glob 14.0.6 fixes both and brings minimatch 11. Awaiting the
+# owner's approval (ARCHITECTURE question 23). Remove this once @bundled-es-modules/glob
+# depends on a fixed glob, or style-dictionary stops using it.
 overrides:
   "@bundled-es-modules/glob>glob": "14.0.6"
