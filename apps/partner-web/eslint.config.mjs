@@ -13,17 +13,13 @@ export default defineConfig([
   ...nextVitals,
   ...nextTypeScript,
   {
+    // Next.js's rules find src/app from this folder, also when the root runs `eslint .`.
+    settings: { next: { rootDir: import.meta.dirname } },
     // eslint-config-next lowers these two to warnings; the workspace treats them as errors.
     rules: {
       '@typescript-eslint/no-unused-vars': 'error',
       '@typescript-eslint/no-unused-expressions': 'error',
     },
   },
-  globalIgnores([
-    '.next/',
-    'next-env.d.ts',
-    'test-results/',
-    'playwright-report/',
-    'screenshots/',
-  ]),
+  globalIgnores(['.next/', 'next-env.d.ts', 'test-results/', 'playwright-report/', 'screenshots/']),
 ]);

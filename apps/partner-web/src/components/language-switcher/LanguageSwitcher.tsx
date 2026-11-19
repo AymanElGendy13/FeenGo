@@ -50,7 +50,12 @@ export function LanguageSwitcher({ locale, title, options }: LanguageSwitcherPro
                 checked={shownLocale === option.value}
                 onChange={() => choose(option.value)}
               />
-              <svg className={styles.check} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <svg
+                className={styles.check}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+              >
                 <path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" fill="currentColor" />
               </svg>
               {/* lang makes screen readers read each name in its own voice. */}

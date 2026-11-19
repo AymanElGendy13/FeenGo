@@ -283,6 +283,8 @@ if (import.meta.main) {
     process.exitCode = 1;
   } else {
     const count = flattenMessages(readMessageFile('en').content).size;
-    console.log(`i18n:check: ${count} keys, the same in English and Arabic, with the same placeholders.`);
+    console.log(
+      `i18n:check: ${count} keys, the same in English and Arabic, with the same placeholders.`,
+    );
   }
 }

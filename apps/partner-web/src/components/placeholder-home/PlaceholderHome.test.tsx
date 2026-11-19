@@ -40,9 +40,7 @@ describe('PlaceholderHome', () => {
 
     renderForCookie('ar');
     expect(screen.getByRole('heading', { level: 1, name: 'FeenGo للشركاء' })).toBeInTheDocument();
-    expect(
-      screen.getByText('أهلًا وسهلًا. أماكن للأكل والسهر والاحتفال قريبًا.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('أهلًا وسهلًا. أماكن للأكل والسهر والاحتفال قريبًا.')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'اللغة' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'العربية' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'English' })).not.toBeChecked();

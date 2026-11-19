@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 // screenshots for design review. Journeys across both websites live in
 // tests/e2e/web (qa-tester).
 //
-// Run `pnpm build` first: the tests start the production server.
+// Run `pnpm build` first: the tests start the standalone production server.
 //
 // PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH points Playwright at a Chromium that is
 // already installed, for machines without the browser build that matches the
@@ -31,7 +31,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `next start --port ${port}`,
+    command: 'node scripts/start-standalone.ts',
+    env: { PORT: String(port) },
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,

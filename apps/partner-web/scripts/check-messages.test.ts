@@ -49,7 +49,10 @@ describe('i18n:check', () => {
   });
 
   it('S0 i18n:check reports empty text, values that are not text and broken braces', () => {
-    const problems = compareMessages(en({ a: '', b: 3, c: 'Hi {name' }), ar({ a: 'أ', b: 'ب', c: 'ج' }));
+    const problems = compareMessages(
+      en({ a: '', b: 3, c: 'Hi {name' }),
+      ar({ a: 'أ', b: 'ب', c: 'ج' }),
+    );
     expect(problems).toEqual([
       'en.json: "a" is empty',
       'en.json: "b" must be text or a group of messages',
