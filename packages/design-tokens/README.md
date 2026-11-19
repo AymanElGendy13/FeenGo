@@ -28,7 +28,7 @@ pnpm --filter @feengo/design-tokens check:contrast  # the contrast check alone
 pnpm --filter @feengo/design-tokens test            # unit tests for the contrast maths
 ```
 
-The build runs the contrast check first. If a pair fails, the build stops with exit code 1 and writes nothing.
+The build runs the contrast check first. If a pair fails, a source file or a theme is missing, or the pairs file is malformed, the build stops with exit code 1 and writes nothing. Otherwise it empties `dist/` and `flutter/lib/` and writes them again, so a file the build no longer produces disappears.
 
 The outputs are committed, so the app builds without Node and reviewers see exactly what changed. CI runs the build and fails if anything in this package differs from what is committed. The outputs carry no timestamps, so the same tokens always give the same bytes.
 
@@ -71,7 +71,7 @@ The designer replaces these with real dark-mode tints when the design system is 
 
 ### Websites
 
-- Import `@feengo/design-tokens/tokens.css` once, in the root layout. It sets the light theme on `:root`, and the dark theme on `[data-theme='dark']`. With no `data-theme` attribute, the page follows the system setting through `prefers-color-scheme`, which is what S0 needs. `data-theme='light'` or `'dark'` on any element forces that theme for its subtree.
+- Import `@feengo/design-tokens/tokens.css` once, in the root layout. With no `data-theme` attribute, the page follows the system setting through `prefers-color-scheme`, and is light when the system states no preference; this is what S0 needs. `data-theme='light'` or `'dark'` on any element forces that theme for its subtree. The light and dark selectors never overlap, so the result does not depend on the order of the rules.
 - Colour roles are `--color-<role>`, for example `--color-on-surface`. `--typography-<step>-line-height` picks the Arabic line height when the page's `lang` is `ar`.
 - `@feengo/design-tokens/tokens` gives the same values as typed constants (`colors.light.surface`, `spacing.md`).
 - The fonts are at `@feengo/design-tokens/fonts/*`, for `next/font/local` (`docs/ARCHITECTURE.md` section 12). They are TrueType files.

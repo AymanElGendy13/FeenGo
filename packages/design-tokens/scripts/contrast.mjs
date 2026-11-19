@@ -100,7 +100,9 @@ export function evaluatePairs(themes, pairs) {
     for (const pair of pairs) {
       const foreground = roles[pair.foreground];
       const background = roles[pair.background];
-      const missing = [pair.foreground, pair.background].filter((role) => !Object.hasOwn(roles, role));
+      const missing = [pair.foreground, pair.background].filter(
+        (role) => !Object.hasOwn(roles, role),
+      );
       if (missing.length > 0) {
         problems.push(`${theme}: role ${missing.join(' and ')} is not defined.`);
         continue;

@@ -103,7 +103,10 @@ export function collectThemes(allTokens) {
     }
   }
   const ordered = Object.fromEntries(
-    REQUIRED_THEMES.map((name) => [name, Object.fromEntries(roles.map((r) => [r, themes[name][r]]))]),
+    REQUIRED_THEMES.map((name) => [
+      name,
+      Object.fromEntries(roles.map((r) => [r, themes[name][r]])),
+    ]),
   );
   return { themes: ordered, roles, descriptions };
 }

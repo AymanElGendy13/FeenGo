@@ -68,22 +68,6 @@ export const typography = {
       ar: 44,
     },
   },
-  headline: {
-    fontSize: 24,
-    fontWeight: 700,
-    lineHeight: {
-      en: 32,
-      ar: 36,
-    },
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 500,
-    lineHeight: {
-      en: 28,
-      ar: 30,
-    },
-  },
   body: {
     fontSize: 16,
     fontWeight: 400,
@@ -98,14 +82,6 @@ export const typography = {
     lineHeight: {
       en: 20,
       ar: 22,
-    },
-  },
-  caption: {
-    fontSize: 12,
-    fontWeight: 400,
-    lineHeight: {
-      en: 16,
-      ar: 18,
     },
   },
 } as const;

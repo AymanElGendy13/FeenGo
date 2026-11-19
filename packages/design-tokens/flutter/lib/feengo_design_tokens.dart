@@ -136,22 +136,6 @@ abstract final class FeenGoTypeScale {
     lineHeightAr: 44,
   );
 
-  /// Headline.
-  static const FeenGoTextStyle headline = FeenGoTextStyle(
-    fontSize: 24,
-    fontWeight: FontWeight.w700,
-    lineHeightEn: 32,
-    lineHeightAr: 36,
-  );
-
-  /// Title.
-  static const FeenGoTextStyle title = FeenGoTextStyle(
-    fontSize: 20,
-    fontWeight: FontWeight.w500,
-    lineHeightEn: 28,
-    lineHeightAr: 30,
-  );
-
   /// Body.
   static const FeenGoTextStyle body = FeenGoTextStyle(
     fontSize: 16,
@@ -166,14 +150,6 @@ abstract final class FeenGoTypeScale {
     fontWeight: FontWeight.w500,
     lineHeightEn: 20,
     lineHeightAr: 22,
-  );
-
-  /// Caption.
-  static const FeenGoTextStyle caption = FeenGoTextStyle(
-    fontSize: 12,
-    fontWeight: FontWeight.w400,
-    lineHeightEn: 16,
-    lineHeightAr: 18,
   );
 }
 

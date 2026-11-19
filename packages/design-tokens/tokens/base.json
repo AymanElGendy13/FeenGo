@@ -50,7 +50,7 @@
     }
   },
   "typography": {
-    "$description": "Type scale. Line heights carry one value per script: Arabic needs more line height than Latin (docs/design/brief.md section 6). Display, body and label are used by docs/design/s0/placeholder-home.md; headline, title and caption are drafts.",
+    "$description": "Type scale. Only the steps docs/design/s0/placeholder-home.md uses; add a step when a spec needs it. Line heights carry one value per script: Arabic needs more line height than Latin (docs/design/brief.md section 6).",
     "display": {
       "fontSize": {
         "$type": "dimension",
@@ -74,62 +74,6 @@
         "ar": {
           "$value": {
             "value": 44,
-            "unit": "px"
-          }
-        }
-      }
-    },
-    "headline": {
-      "fontSize": {
-        "$type": "dimension",
-        "$value": {
-          "value": 24,
-          "unit": "px"
-        }
-      },
-      "fontWeight": {
-        "$type": "fontWeight",
-        "$value": "{font.weight.bold}"
-      },
-      "lineHeight": {
-        "$type": "dimension",
-        "en": {
-          "$value": {
-            "value": 32,
-            "unit": "px"
-          }
-        },
-        "ar": {
-          "$value": {
-            "value": 36,
-            "unit": "px"
-          }
-        }
-      }
-    },
-    "title": {
-      "fontSize": {
-        "$type": "dimension",
-        "$value": {
-          "value": 20,
-          "unit": "px"
-        }
-      },
-      "fontWeight": {
-        "$type": "fontWeight",
-        "$value": "{font.weight.medium}"
-      },
-      "lineHeight": {
-        "$type": "dimension",
-        "en": {
-          "$value": {
-            "value": 28,
-            "unit": "px"
-          }
-        },
-        "ar": {
-          "$value": {
-            "value": 30,
             "unit": "px"
           }
         }
@@ -186,34 +130,6 @@
         "ar": {
           "$value": {
             "value": 22,
-            "unit": "px"
-          }
-        }
-      }
-    },
-    "caption": {
-      "fontSize": {
-        "$type": "dimension",
-        "$value": {
-          "value": 12,
-          "unit": "px"
-        }
-      },
-      "fontWeight": {
-        "$type": "fontWeight",
-        "$value": "{font.weight.regular}"
-      },
-      "lineHeight": {
-        "$type": "dimension",
-        "en": {
-          "$value": {
-            "value": 16,
-            "unit": "px"
-          }
-        },
-        "ar": {
-          "$value": {
-            "value": 18,
             "unit": "px"
           }
         }
