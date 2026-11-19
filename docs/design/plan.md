@@ -359,7 +359,7 @@ Logo masters and app-icon source files need a home. They do not belong in `docs/
    | "When a slice is done", step 1: "Its screens are designed and approved in Arabic and English." | Its screens have build approval in English and Arabic, and are built to match. **Visual approval** of all shipped screens is required before the first public release after S6, not for each slice. |
 
    Only after the owner approves will a `docs/DECISIONS.md` entry and a `docs/ROADMAP.md` edit follow. Until then the ROADMAP wording stands.
-2. **Approve the S0 placeholder spec,** including the first-launch language rule, and saving the language choice in S0 (C-03 groundwork brought forward from S1).
+2. **Approve the S0 placeholder spec,** and saving the language choice in S0 (the first-launch language was decided on 2026-11-19: always English, DECISIONS.md) (C-03 groundwork brought forward from S1).
 3. **In-app appearance control.** Neither the ROADMAP nor the PRD asks for one. S0 follows the phone's light or dark setting only, which still proves both themes. Should the app also offer a System, Light and Dark choice from S1? If yes, it becomes the S1 "Appearance setting" screen, with no PRD ID.
 4. **Choose the design tool** (Figma or Penpot), where designs live and who has access.
 5. **Arabic digits** in Arabic screens: Western or Arabic-Indic. Needed for S1.
