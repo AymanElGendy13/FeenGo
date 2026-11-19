@@ -347,16 +347,20 @@ jobs:
       - name: Playwright smoke test
         run: pnpm --filter @feengo/partner-web test:e2e
 
-      # The HTML report, and the screenshots, diffs and traces Playwright writes
-      # to test-results/ when a test fails. Kept for seven days.
-      - name: Upload the Playwright report
-        if: failure()
+      # The screenshots taken for design review (screenshots/, both languages),
+      # and on a failure whatever Playwright wrote to test-results/ (screenshots,
+      # error context). Uploaded on success too, because the screenshots are a
+      # few small images. playwright-report/ is listed in case an HTML reporter
+      # is added later. Kept for seven days.
+      - name: Upload the Playwright screenshots and results
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: partner-web-playwright
           path: |
-            apps/partner-web/playwright-report/
+            apps/partner-web/screenshots/
             apps/partner-web/test-results/
+            apps/partner-web/playwright-report/
           retention-days: 7
           if-no-files-found: ignore
 

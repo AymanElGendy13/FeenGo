@@ -24,6 +24,9 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+# Design-review screenshots the websites' Playwright tests write. Scoped to apps/
+# so store/ listing screenshots stay committed.
+apps/*/screenshots/
 
 # Flutter
 .dart_tool/

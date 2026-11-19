@@ -33,6 +33,7 @@ export default defineConfig([
     '**/playwright-report/',
     '**/blob-report/',
     '**/playwright/.cache/',
+    'apps/*/screenshots/',
     // Flutter app: linted by `flutter analyze`, not ESLint.
     'apps/mobile/',
     // Documents only; owned by the architect and others.
