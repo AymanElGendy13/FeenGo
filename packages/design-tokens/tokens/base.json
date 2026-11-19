@@ -1,0 +1,378 @@
+{
+  "color": {
+    "$type": "color",
+    "$description": "Raw provisional palette (docs/ROADMAP.md). Not exported to the apps.",
+    "primary": {
+      "$value": "#B3204F",
+      "$description": "Primary (raspberry)"
+    },
+    "accent": {
+      "$value": "#F2A93B",
+      "$description": "Accent (amber)"
+    },
+    "success": {
+      "$value": "#0E6B5E",
+      "$description": "Success (teal)"
+    },
+    "neutralDark": {
+      "$value": "#1C2430",
+      "$description": "Dark neutral"
+    },
+    "neutralLight": {
+      "$value": "#FBF6EE",
+      "$description": "Light neutral"
+    },
+    "white": {
+      "$value": "#FFFFFF",
+      "$description": "White"
+    }
+  },
+  "font": {
+    "family": {
+      "base": {
+        "$type": "fontFamily",
+        "$value": ["IBM Plex Sans Arabic", "system-ui", "sans-serif"],
+        "$description": "One family for English and Arabic (docs/ROADMAP.md). The first name is the family declared in the Flutter package and in fonts/."
+      }
+    },
+    "weight": {
+      "$type": "fontWeight",
+      "$description": "Only the weights shipped in fonts/.",
+      "regular": {
+        "$value": 400
+      },
+      "medium": {
+        "$value": 500
+      },
+      "bold": {
+        "$value": 700
+      }
+    }
+  },
+  "typography": {
+    "$description": "Type scale. Line heights carry one value per script: Arabic needs more line height than Latin (docs/design/brief.md section 6). Display, body and label are used by docs/design/s0/placeholder-home.md; headline, title and caption are drafts.",
+    "display": {
+      "fontSize": {
+        "$type": "dimension",
+        "$value": {
+          "value": 32,
+          "unit": "px"
+        }
+      },
+      "fontWeight": {
+        "$type": "fontWeight",
+        "$value": "{font.weight.bold}"
+      },
+      "lineHeight": {
+        "$type": "dimension",
+        "en": {
+          "$value": {
+            "value": 40,
+            "unit": "px"
+          }
+        },
+        "ar": {
+          "$value": {
+            "value": 44,
+            "unit": "px"
+          }
+        }
+      }
+    },
+    "headline": {
+      "fontSize": {
+        "$type": "dimension",
+        "$value": {
+          "value": 24,
+          "unit": "px"
+        }
+      },
+      "fontWeight": {
+        "$type": "fontWeight",
+        "$value": "{font.weight.bold}"
+      },
+      "lineHeight": {
+        "$type": "dimension",
+        "en": {
+          "$value": {
+            "value": 32,
+            "unit": "px"
+          }
+        },
+        "ar": {
+          "$value": {
+            "value": 36,
+            "unit": "px"
+          }
+        }
+      }
+    },
+    "title": {
+      "fontSize": {
+        "$type": "dimension",
+        "$value": {
+          "value": 20,
+          "unit": "px"
+        }
+      },
+      "fontWeight": {
+        "$type": "fontWeight",
+        "$value": "{font.weight.medium}"
+      },
+      "lineHeight": {
+        "$type": "dimension",
+        "en": {
+          "$value": {
+            "value": 28,
+            "unit": "px"
+          }
+        },
+        "ar": {
+          "$value": {
+            "value": 30,
+            "unit": "px"
+          }
+        }
+      }
+    },
+    "body": {
+      "fontSize": {
+        "$type": "dimension",
+        "$value": {
+          "value": 16,
+          "unit": "px"
+        }
+      },
+      "fontWeight": {
+        "$type": "fontWeight",
+        "$value": "{font.weight.regular}"
+      },
+      "lineHeight": {
+        "$type": "dimension",
+        "en": {
+          "$value": {
+            "value": 24,
+            "unit": "px"
+          }
+        },
+        "ar": {
+          "$value": {
+            "value": 26,
+            "unit": "px"
+          }
+        }
+      }
+    },
+    "label": {
+      "fontSize": {
+        "$type": "dimension",
+        "$value": {
+          "value": 14,
+          "unit": "px"
+        }
+      },
+      "fontWeight": {
+        "$type": "fontWeight",
+        "$value": "{font.weight.medium}"
+      },
+      "lineHeight": {
+        "$type": "dimension",
+        "en": {
+          "$value": {
+            "value": 20,
+            "unit": "px"
+          }
+        },
+        "ar": {
+          "$value": {
+            "value": 22,
+            "unit": "px"
+          }
+        }
+      }
+    },
+    "caption": {
+      "fontSize": {
+        "$type": "dimension",
+        "$value": {
+          "value": 12,
+          "unit": "px"
+        }
+      },
+      "fontWeight": {
+        "$type": "fontWeight",
+        "$value": "{font.weight.regular}"
+      },
+      "lineHeight": {
+        "$type": "dimension",
+        "en": {
+          "$value": {
+            "value": 16,
+            "unit": "px"
+          }
+        },
+        "ar": {
+          "$value": {
+            "value": 18,
+            "unit": "px"
+          }
+        }
+      }
+    }
+  },
+  "spacing": {
+    "$type": "dimension",
+    "$description": "Spacing on a 4 px grid. One px here is one logical pixel (dp) in Flutter.",
+    "xs": {
+      "$value": {
+        "value": 4,
+        "unit": "px"
+      }
+    },
+    "sm": {
+      "$value": {
+        "value": 8,
+        "unit": "px"
+      }
+    },
+    "md": {
+      "$value": {
+        "value": 16,
+        "unit": "px"
+      }
+    },
+    "lg": {
+      "$value": {
+        "value": 24,
+        "unit": "px"
+      }
+    },
+    "xl": {
+      "$value": {
+        "value": 32,
+        "unit": "px"
+      }
+    },
+    "xxl": {
+      "$value": {
+        "value": 48,
+        "unit": "px"
+      }
+    }
+  },
+  "radius": {
+    "$type": "dimension",
+    "xs": {
+      "$value": {
+        "value": 4,
+        "unit": "px"
+      }
+    },
+    "sm": {
+      "$value": {
+        "value": 8,
+        "unit": "px"
+      }
+    },
+    "md": {
+      "$value": {
+        "value": 12,
+        "unit": "px"
+      }
+    },
+    "lg": {
+      "$value": {
+        "value": 16,
+        "unit": "px"
+      }
+    },
+    "full": {
+      "$value": {
+        "value": 9999,
+        "unit": "px"
+      },
+      "$description": "Fully rounded ends (pill shape)"
+    }
+  },
+  "size": {
+    "$type": "dimension",
+    "touchTargetMin": {
+      "$value": {
+        "value": 48,
+        "unit": "px"
+      },
+      "$description": "Smallest touch target. Also meets the 44 by 44 point iOS minimum."
+    },
+    "contentMaxWidth": {
+      "$value": {
+        "value": 480,
+        "unit": "px"
+      },
+      "$description": "Widest a single content column grows, for tablets and desktop"
+    }
+  },
+  "stroke": {
+    "$type": "dimension",
+    "outline": {
+      "$value": {
+        "value": 1,
+        "unit": "px"
+      },
+      "$description": "Control edges and dividers"
+    },
+    "focusRing": {
+      "$value": {
+        "value": 2,
+        "unit": "px"
+      },
+      "$description": "Width of the focus ring, drawn outside the control"
+    },
+    "focusGap": {
+      "$value": {
+        "value": 2,
+        "unit": "px"
+      },
+      "$description": "Gap in the surface colour between a control and its focus ring"
+    }
+  },
+  "motion": {
+    "$description": "Short and purposeful. Apps drop motion when the reduce-motion setting is on.",
+    "duration": {
+      "$type": "duration",
+      "short": {
+        "$value": {
+          "value": 100,
+          "unit": "ms"
+        }
+      },
+      "medium": {
+        "$value": {
+          "value": 200,
+          "unit": "ms"
+        },
+        "$description": "Theme crossfade (docs/design/s0/placeholder-home.md)"
+      },
+      "long": {
+        "$value": {
+          "value": 300,
+          "unit": "ms"
+        }
+      }
+    },
+    "easing": {
+      "$type": "cubicBezier",
+      "standard": {
+        "$value": [0.2, 0, 0, 1],
+        "$description": "Most transitions"
+      },
+      "decelerate": {
+        "$value": [0, 0, 0, 1],
+        "$description": "Elements entering the screen"
+      },
+      "accelerate": {
+        "$value": [0.3, 0, 1, 1],
+        "$description": "Elements leaving the screen"
+      }
+    }
+  }
+}

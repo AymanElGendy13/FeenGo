@@ -777,7 +777,7 @@ apps/mobile/
 **Source.** `packages/design-tokens/tokens/*.json` in the W3C Design Tokens Community Group format (`$value`, `$type`):
 
 - `base.json`: the raw palette (the five provisional colours from ROADMAP.md), type scale, spacing, radius, motion.
-- `theme.light.json`, `theme.dark.json`: semantic roles (`color.background`, `color.on-background`, `color.primary`, `color.on-primary`, ...) that point to base values.
+- `theme.light.json`, `theme.dark.json`: semantic roles (`surface`, `onSurface`, `brandText`, `outline`, `selected`, `onSelected`, `focus`; the S0 set is in the table below) that point to base values. Apps use only these roles, never the raw palette.
 - `fonts/`: IBM Plex Sans Arabic files and their Open Font License. It covers both Arabic and Latin.
 
 **Build.** Style Dictionary 5 (`pnpm --filter @feengo/design-tokens build`) writes:

@@ -1,0 +1,38 @@
+{
+  "theme": {
+    "dark": {
+      "$description": "Dark theme: the S0 colour roles (docs/ARCHITECTURE.md section 13). TEMPORARY: brandText and selected use the light neutral because the provisional primary fails contrast on the dark neutral (2.41 to 1). The designer replaces them with real tints when the design system is approved. Both theme files must define the same roles.",
+      "color": {
+        "$type": "color",
+        "surface": {
+          "$value": "{color.neutralDark}",
+          "$description": "Screen background, unselected segments"
+        },
+        "onSurface": {
+          "$value": "{color.neutralLight}",
+          "$description": "Body text, titles, unselected labels"
+        },
+        "brandText": {
+          "$value": "{color.neutralLight}",
+          "$description": "App name. Temporary: primary fails on the dark surface."
+        },
+        "outline": {
+          "$value": "{color.neutralLight}",
+          "$description": "Control edges and dividers"
+        },
+        "selected": {
+          "$value": "{color.neutralLight}",
+          "$description": "Fill of a selected control. Temporary: primary fails on the dark surface."
+        },
+        "onSelected": {
+          "$value": "{color.neutralDark}",
+          "$description": "Label on a selected fill"
+        },
+        "focus": {
+          "$value": "{color.accent}",
+          "$description": "Focus ring, drawn outside the control with a 2 dp gap in surface"
+        }
+      }
+    }
+  }
+}

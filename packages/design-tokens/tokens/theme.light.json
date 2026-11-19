@@ -1,0 +1,38 @@
+{
+  "theme": {
+    "light": {
+      "$description": "Light theme: the S0 colour roles (docs/ARCHITECTURE.md section 13, docs/design/s0/placeholder-home.md). Every role points to a base colour. Both theme files must define the same roles.",
+      "color": {
+        "$type": "color",
+        "surface": {
+          "$value": "{color.neutralLight}",
+          "$description": "Screen background, unselected segments"
+        },
+        "onSurface": {
+          "$value": "{color.neutralDark}",
+          "$description": "Body text, titles, unselected labels"
+        },
+        "brandText": {
+          "$value": "{color.primary}",
+          "$description": "App name"
+        },
+        "outline": {
+          "$value": "{color.neutralDark}",
+          "$description": "Control edges and dividers"
+        },
+        "selected": {
+          "$value": "{color.primary}",
+          "$description": "Fill of a selected control"
+        },
+        "onSelected": {
+          "$value": "{color.white}",
+          "$description": "Label on a selected fill"
+        },
+        "focus": {
+          "$value": "{color.primary}",
+          "$description": "Focus ring, drawn outside the control with a 2 dp gap in surface"
+        }
+      }
+    }
+  }
+}
