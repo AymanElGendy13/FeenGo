@@ -60,13 +60,13 @@ The same centred card as admin sign-in.
 | --- | --- | --- | --- |
 | `admin.totp.title` | Enter your authenticator code | إدخال رمز تطبيق المصادقة | Heading |
 | `admin.totp.pageTitle` | Authenticator code · FeenGo Admin | رمز المصادقة · إدارة FeenGo | Browser tab title |
-| `admin.totp.body` | Open your authenticator app and enter the 6-digit code for FeenGo Admin. | يُرجى فتح تطبيق المصادقة وإدخال الرمز المكوّن من 6 أرقام الخاص بإدارة FeenGo. | |
+| `admin.totp.body` | Open your authenticator app and enter the {length}-digit code for FeenGo Admin. | يُرجى فتح تطبيق المصادقة وإدخال الرمز المكوّن من {length} أرقام الخاص بإدارة FeenGo. | `{length}` is 6, filled by the number formatter |
 | `admin.totp.field` | Authenticator code | رمز المصادقة | Label |
 | `admin.totp.submit` | Sign in | تسجيل الدخول | Primary |
 | `admin.totp.checking` | Checking code | جارٍ التحقق من الرمز | Spoken |
-| `admin.totp.hint` | The code changes every 30 seconds. If it's about to change, wait for the next one. | يتغيّر الرمز كل 30 ثانية. إذا كان على وشك التغيّر، يُرجى انتظار الرمز التالي. | 30 seconds is the TOTP standard step, not a setting |
+| `admin.totp.hint` | The code changes every {duration}. If it's about to change, wait for the next one. | يتغيّر الرمز كل {duration}. إذا كان على وشك التغيّر، يُرجى انتظار الرمز التالي. | `{duration}` is 30 seconds (the TOTP step, not a setting), from `common.duration.seconds`. Arabic needs review: "كل 30 ثانية" reads correctly with the plural form. |
 | `admin.totp.differentAccount` | Use a different account | استخدام حساب آخر | |
-| `admin.totp.error.format` | Enter the 6 digits from your authenticator app. | يُرجى إدخال الأرقام الستة من تطبيق المصادقة. | |
+| `admin.totp.error.format` | Enter the {length} digits from your authenticator app. | يُرجى إدخال الأرقام الـ {length} من تطبيق المصادقة. | `{length}` is 6, filled by the number formatter |
 | `error.TOTP_INVALID` | That code isn't right, or it was already used. {count, plural, one {# try left.} other {# tries left.}} | الرمز غير صحيح أو سبق استخدامه. {count, plural, zero {لا توجد محاولات متبقية.} one {تتبقى محاولة واحدة.} two {تتبقى محاولتان.} few {تتبقى # محاولات.} many {تتبقى # محاولة.} other {تتبقى # محاولة.}} | `count` from `attemptsRemaining` |
 | `error.MFA_TOKEN_INVALID` | Sign-in took too long. Enter your password again. | استغرق تسجيل الدخول وقتًا طويلًا. يُرجى إدخال كلمة المرور مرة أخرى. | Shown as `admin.signIn.notice.mfaExpired` on admin sign-in; same text |
 | `admin.signIn.notice.mfaExpired` | Sign-in took too long. Enter your password again. | استغرق تسجيل الدخول وقتًا طويلًا. يُرجى إدخال كلمة المرور مرة أخرى. | |

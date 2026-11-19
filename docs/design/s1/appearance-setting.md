@@ -70,5 +70,5 @@ Label at the start, radio at the end; both mirror. The options keep their logica
 
 - One radio group named "Appearance", each option announced with its state.
 - Focus stays on the chosen option after a change.
-- Each row is at least 48 dp tall.
+- The back button is at least 44 by 44 points. Each row is at least 48 dp tall.
 - Contrast passes in both themes, from the token build's check.

@@ -26,7 +26,7 @@ Rules for every entry:
 
 | English | Arabic | Audience | Notes |
 | --- | --- | --- | --- |
-| Guest (visitor) | زائر | Customers | Someone using the app without an account. "Visitor" is the PRD's role name; on screen, "guest" (التصفح كزائر, "browsing as a guest"). |
+| Guest (visitor) | بدون حساب | Customers | Someone using the app without an account. "Visitor" is the PRD's role name; on screen, "guest". Arabic says "without an account" (التصفح بدون حساب), because زائر is masculine. |
 | Customer | عميل | Venues and admins | Never used to address customers on screen |
 | Admin | مسؤول | Admins | A member of the FeenGo team in the back office. Plural مسؤولون. |
 | Owner (FeenGo owner) | مالك FeenGo | Admins | The person who runs the server commands, such as unlocking an admin |

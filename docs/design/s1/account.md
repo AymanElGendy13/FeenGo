@@ -102,7 +102,7 @@ Visitors see no "Edit profile", "Sign out" or "Delete account".
 | `account.row.signOut` | Sign out | تسجيل الخروج | |
 | `account.row.delete` | Delete account | حذف الحساب | |
 | `account.version` | Version {version} | الإصدار {version} | `{version}` left to right |
-| `account.visitor.title` | You're browsing as a guest | التصفح كزائر | |
+| `account.visitor.title` | You're browsing as a guest | التصفح بدون حساب | Arabic avoids "زائر", which is masculine |
 | `account.visitor.body` | Sign in or create an account with your mobile number. | يمكن تسجيل الدخول أو إنشاء حساب برقم الهاتف المحمول. | S3 and S4 may extend this with what an account is for |
 | `account.visitor.action` | Sign in | تسجيل الدخول | Primary |
 | `account.sessionEnded` | You've been signed out. Sign in again to see your profile. | تم تسجيل الخروج. يُرجى تسجيل الدخول مرة أخرى لعرض الملف الشخصي. | |
@@ -141,7 +141,7 @@ Signing out keeps the language choice and the installation ID on the phone.
 - **Rows** are announced as buttons with their value: "Language, English, button".
 - **"Delete account"** is announced with its words only; the colour and icon are not the only signal.
 - **Focus order:** top bar, profile card or sign-in card, rows top to bottom, version.
-- **Touch targets:** every row is at least 48 dp tall and full width.
+- **Touch targets:** the back button (option 1) is at least 44 by 44 points. Every row is at least 48 dp tall and full width.
 - **Largest text size:** nothing cut off; values wrap under titles.
 
 ## Review checklist after the build

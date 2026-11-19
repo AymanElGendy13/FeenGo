@@ -47,7 +47,7 @@ Every screen waits on plan decision 1 (what approval means) and plan decision 6 
 
 ### Not specified: first-time authenticator setup
 
-`docs/design/plan.md` lists "Second-step setup on first sign-in" for the back office. The architecture has no such step: `admin:create` prints the authenticator link and secret once, in a terminal, and every admin row is created with a secret (`docs/ARCHITECTURE.md` section 9.2, `admin_users.totp_secret_ciphertext` is not null). No endpoint enrols an authenticator. So there is no setup screen in S1. If the owner wants enrolment in the browser instead, the architect changes the contract first and this screen is added.
+`docs/design/plan.md` lists "Second-step setup on first sign-in" for the back office. The architecture has no such step: `admin:create` prints the authenticator link and secret once, in a terminal, and every admin row is created with a secret (`docs/ARCHITECTURE.md` section 9.2, `admin_users.totp_secret_ciphertext` is not null). No endpoint enrols an authenticator. So, under the Q9 proposal, there is no setup screen in S1. If the owner wants enrolment in the browser instead, the architect changes the contract first and this screen is added.
 
 ### The S0 placeholder home in S1
 
@@ -55,7 +55,7 @@ The S0 placeholder home keeps its app name and welcome line. Its language contro
 
 ## Open questions raised by these specs
 
-| ID | Question | Screens | Default if unanswered |
+| ID | Question | Screens | Proposal (the build waits on the answer) |
 | --- | --- | --- | --- |
 | S1-Q1 | Is sign-in offered at first launch, with "Continue without an account"? Or does the app open on Home and ask only when an action needs an account? | Phone entry | The app opens on Home (option A in `phone-entry.md`) |
 | S1-Q2 | What is the customer's email used for? The PRD makes it optional (C-04) but gives no purpose. `docs/STACK.md` says "collect only what a booking needs", and the privacy policy must say why it is collected. | Complete profile, edit profile | No helper text explains the purpose |
@@ -71,20 +71,20 @@ Gaps found while writing these specs. They are recorded here for the architect a
 | G1 | `plan.md` lists "second-step setup on first sign-in" for admins. The architecture enrols the authenticator by a server command, and no endpoint exists for it, so there is no setup screen. | README | Owner, architect |
 | G2 | There is no admin password reset. `docs/ARCHITECTURE.md` section 9.2 has `admin:reset-totp`, `admin:unlock` and `admin:disable`, but no command to reset a forgotten password. | Admin sign-in | Architect |
 | G3 | What a disabled admin gets at the password step is not defined. `POST /v1/admin/auth/sign-in` declares no `403 ADMIN_DISABLED`; only the second step does. | Admin sign-in, authenticator code | Architect |
-| G4 | When `proxy.ts` sends an admin to sign-in, the page is not told why (signed out or session ended), nor where to return. These specs propose `reason` and `from`. | Admin signed out | Architect, web-dev |
+| G4 | When `proxy.ts` sends an admin to sign-in, the page is not told why (signed out, session ended, or account disabled), nor where to return. These specs propose `reason=signed_out`, `reason=session_ended` and `reason=disabled`, and `from`. | Admin signed out | Architect, web-dev |
 | G5 | `TOTP_INVALID`'s `attemptsRemaining` counts tries left on the `mfaToken` (3). The lock counts wrong passwords and codes per email (5). An admin can be told "1 try left" and then be locked, or locked with tries "left". | Authenticator code | Architect |
 | G6 | No endpoint lists admins, so the activity log cannot offer an admin picker for `actorAdminId`. These specs filter by clicking a name instead. | Activity log | Architect |
 | G7 | No endpoint returns one activity log entry, so an entry cannot be linked to directly. Also, `ActivityLogEntry` leaves out the `ip_address` and `request_id` that the table stores "for security review". | Activity log entry | Architect |
 | G8 | For `admin.sign_in_failed` and `admin.locked`, who the actor is (the admin whose email was used, who may not be the person trying) is not defined, so "Who" may mislead. | Activity log | Architect |
 | G9 | No endpoint exposes `auth.otp.allowed_country_codes`. If Q7 is answered "more countries", the phone field cannot know which countries to offer. | Phone entry | Architect |
-| G10 | When the language on the phone and the account's `language` differ at sign-in, nothing says which wins, or how a failed language update is retried. These specs propose: the phone wins and the app retries. Related to plan section 7, question 6. | Code entry, language setting | Architect |
+| G10 | When the app's current language and the account's `language` differ at sign-in, nothing says which wins, or how a failed language update is retried. These specs propose: the app's current language wins and the app retries. (The app's language is English at first launch and changes only by the person's choice, `docs/DECISIONS.md` 2026-11-19.) Related to plan section 7, question 6. | Code entry, language setting | Architect |
 | G11 | `OtpChallenge` gives only absolute times, and the contract declares no server time header. A phone with a wrong clock shows wrong countdowns. Durations in seconds, or a declared `Date` header, would fix it. | Code entry | Architect |
 | G12 | No automatic code autofill method is chosen for Android (SMS User Consent, SMS Retriever, or WhatsApp one-tap). Each needs a library and changes to the message templates. | Code entry | Architect |
 | G13 | `FieldError.code` is free text with examples, not an enum, and the mapping from validation to codes is still open (`docs/ARCHITECTURE.md` section 4.7). Clients cannot be sure every field error has a translation. | Complete profile, edit profile, admin sign-in | Architect |
 | G14 | A customer cannot change their phone number (not in C-04 or the contract). A new number means deleting the account and starting again. | Edit profile | Owner |
 | G15 | The email's purpose is not stated (S1-Q2), and it is not verified in S1. | Complete profile, edit profile | Owner |
 | G16 | A-09 mentions versions of "the terms", but no requirement says customers accept terms, nothing records it in S1, and the architecture does not say where the legal pages live (S1-Q3). | Phone entry, legal pages | Owner, lawyer, architect |
-| G17 | Confirming before deletion uses the normal code check, which starts a second session on the same phone. If the person then cancels, the first session stays open until it expires. | Delete account | Architect |
+| G17 | Confirming before deletion uses the normal code check, which starts a second session on the same phone. If the person then cancels, the first session stays open until it expires. Also, after a timed-out `DELETE /v1/me`, no endpoint can confirm whether the account was deleted: a `401` can have other causes. | Delete account | Architect |
 | G18 | `docs/ARCHITECTURE.md` section 23 tests C-01 by "opening the profile". Account must stay open to visitors for the language setting (C-03), so in these specs the protected S1 screens are edit profile and delete account. The C-01 test should name them. Q19 covers the rest. | Sign-in prompt, account | Architect, qa-tester |
 | G19 | If a lawyer says analytics needs consent (Q6), S1 needs a consent screen that is not in the inventory. | Phone entry | Owner, lawyer |
 
@@ -108,7 +108,7 @@ What is shown on Arabic screens depends on the decision:
 | Matches the WhatsApp or SMS message? | Yes, if the message uses Western digits | Only if the Arabic message template uses Arabic-Indic digits too |
 | Fonts | Plex Sans Arabic has equal-width Western digits | Plex Sans Arabic's Arabic-Indic digits are not equal width, so code boxes and countdowns need fixed-width cells (`brief.md` section 6) |
 
-`docs/design/brief.md` section 6 recommends option A. English screens always use Western digits. The Arabic copy in these specs is written with Western digits as placeholders. Numbers are always formatted by the platform's number formatter with the chosen digit set, never typed into translation strings.
+`docs/design/brief.md` section 6 recommends option A. English screens always use Western digits. Numbers are never typed into translation strings. Every number in a string is a placeholder, such as `{length}` or `{duration}`, filled by the platform's number formatter with the chosen digit set. Numbers that appear in this README's examples are for illustration only.
 
 ### Arabic voice (plan decision 6)
 
@@ -162,7 +162,11 @@ No screen states a fixed number of minutes, tries or seconds. They are settings 
 | Tries left | `attemptsRemaining` with `OTP_INVALID` or `TOTP_INVALID` |
 | Lock or wait time | `retryAfterSeconds` (or `Retry-After`) with `OTP_LOCKED`, `OTP_RESEND_TOO_SOON`, `RATE_LIMITED`, `ADMIN_SIGN_IN_LOCKED` |
 
-Countdowns run from when the response arrived, using the gap between the server time and the phone's clock, so a wrong phone clock does not break them (gap G11: the contract does not declare a server time header).
+Countdowns should run from when the response arrived, using the gap between the server's time and the phone's clock, so a wrong phone clock does not break them. The contract gives no reliable server time (gap G11). **Until G11 is answered**, the app counts against the phone's clock and lets the server decide:
+
+- A resend sent too early gets `OTP_RESEND_TOO_SOON`, and the countdown restarts from its `retryAfterSeconds`, which is a duration and so not affected by the clock.
+- When the phone's clock says the code has expired, code entry shows the resend actions but keeps the code boxes enabled. Only the server's `OTP_EXPIRED` disables them. A code that is still valid on the server is never refused by the app.
+- Lock and wait times always come from `retryAfterSeconds`, never from absolute times.
 
 Durations use these keys, with ICU plurals. Arabic has six plural forms.
 

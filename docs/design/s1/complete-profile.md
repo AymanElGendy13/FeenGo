@@ -78,7 +78,7 @@ The request sends only fields that have a value: `name` trimmed, `email` trimmed
 | `profile.complete.save` | Save and continue | حفظ ومتابعة | Primary button |
 | `profile.complete.skip` | Skip for now | تخطٍّ الآن | Q8 yes only |
 | `profile.saving` | Saving | جارٍ الحفظ | Spoken |
-| `profile.complete.saved` | Welcome to FeenGo. | مرحبًا بك في FeenGo. | Snackbar. "بك" is gendered when spoken; alternative "أهلًا وسهلًا في FeenGo." for review. |
+| `profile.complete.saved` | Welcome to FeenGo. | أهلًا وسهلًا في FeenGo. | Snackbar. Gender-neutral; avoids "مرحبًا بك", which is read as gendered. |
 | `profile.error.name.required` | Enter a name to continue. | يُرجى إدخال الاسم للمتابعة. | Q8 no |
 | `profile.error.name.tooLong` | Use {max} characters or fewer. | يُرجى ألا يزيد الاسم على {max} حرفًا. | `{max}` is 80, from the contract |
 | `profile.error.email.format` | Enter an email address like name@example.com. | يُرجى إدخال بريد إلكتروني صحيح، مثل name@example.com. | The example is a left-to-right isolate |

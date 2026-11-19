@@ -51,7 +51,7 @@ The same centred card as admin sign-in.
 | `admin.locked.title` | Sign-in locked | تم قفل تسجيل الدخول | Heading |
 | `admin.locked.pageTitle` | Sign-in locked · FeenGo Admin | تم قفل تسجيل الدخول · إدارة FeenGo | Browser tab |
 | `error.ADMIN_SIGN_IN_LOCKED` | There were too many wrong passwords or codes for this email. Try again in {duration}, at {time}. | تم إدخال كلمات مرور أو رموز خاطئة عدة مرات لهذا البريد الإلكتروني. يُرجى المحاولة مرة أخرى بعد {duration}، في الساعة {time}. | `{time}` in Cairo time, `HH:mm`, left to right |
-| `admin.locked.help` | If these attempts weren't yours, tell the FeenGo owner. They can unlock sign-in straight away. | في حال عدم معرفة مصدر هذه المحاولات، يُرجى إبلاغ مالك FeenGo، إذ يمكنه إلغاء القفل فورًا. | |
+| `admin.locked.help` | If these attempts weren't yours, tell the FeenGo owner. They can unlock sign-in straight away. | في حال عدم معرفة مصدر هذه المحاولات، يُرجى إبلاغ مالك FeenGo، إذ يمكن إلغاء القفل فورًا. | |
 | `admin.locked.ended` | You can try again now. | يمكن المحاولة الآن. | |
 | `admin.locked.back` | Back to sign-in | العودة إلى تسجيل الدخول | |
 

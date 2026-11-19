@@ -28,7 +28,7 @@ Desktop first, works on a tablet and a phone. One centred card, at most 400 px w
 
 | # | Element | Component | Notes |
 | --- | --- | --- | --- |
-| 1 | Language control | Two links or a small radio group, "English" and "العربية", at the top end of the page, outside the card | The same cookie as every admin page |
+| 1 | Language control | Two links or a small radio group, "English" and "العربية", at the top end of the page, outside the card | The same cookie as every admin page. **First visit: always English** (`docs/DECISIONS.md`, 2026-11-19), whatever the browser's language. Only the admin's own choice here, or on any admin page, changes it. |
 | 2 | Product name, "FeenGo Admin" | Text, not a heading | `admin.app.name` from S0 |
 | 3 | Title, "Sign in" | Heading level 1 | |
 | 4 | Notice | Inline banner, information | Only after signing out or a session ending (see `admin-signed-out.md`) or a timed-out second step |
@@ -50,6 +50,7 @@ The page is a plain HTML form that posts to the route handler, so it works befor
 | Password too long | `400` `/password` `TOO_LONG` | Field message `admin.signIn.error.passwordTooLong` |
 | Checking | Form posted | Button progress, spoken `admin.signIn.checking`. Fields read-only. |
 | Password accepted | `200 AdminMfaChallenge` | The route handler sets the short `mfa` cookie and redirects to the authenticator code page. No session yet. |
+| Disabled admin, correct password | Not defined by the contract (README, gap G3) | **Assumed** until G3 is answered: the API answers `401 INVALID_CREDENTIALS`, so this page shows the same message as a wrong password and reveals nothing. If the architect instead lets the password step succeed, the disabled message appears on the authenticator code page (`403 ADMIN_DISABLED`). |
 | Wrong email or password | `401 INVALID_CREDENTIALS` | Banner `error.INVALID_CREDENTIALS`. The password field is cleared and focused; the email stays. It never says which one is wrong, and never shows tries left. |
 | Locked | `423 ADMIN_SIGN_IN_LOCKED` | Redirect to the locked page, with the wait from `Retry-After` |
 | Too many requests | `429 RATE_LIMITED` | Banner `error.RATE_LIMITED` with the wait. "Continue" disabled until it ends (with scripts), or refused again (without). |

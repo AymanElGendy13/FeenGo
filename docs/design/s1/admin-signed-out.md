@@ -26,11 +26,11 @@ This is not a separate page. It is the admin sign-in page with one of two notice
 
 | | Signed out | Session ended |
 | --- | --- | --- |
-| Cause | The admin chose "Sign out" in the header. `POST /session/sign-out` deletes the cookies and calls `POST /v1/auth/logout`; the API logs `admin.signed_out` (A-11). | Refresh failed in `proxy.ts` (`REFRESH_TOKEN_INVALID`, `REFRESH_TOKEN_REUSED`, idle or absolute limit), `requireAdmin()` failed, `GET /v1/admin/me` answered `401`, or `ADMIN_DISABLED` on refresh |
+| Cause | The admin chose "Sign out" in the header. `POST /session/sign-out` deletes the cookies and calls `POST /v1/auth/logout`; the API logs `admin.signed_out` (A-11). | Refresh failed in `proxy.ts` (`REFRESH_TOKEN_INVALID`, `REFRESH_TOKEN_REUSED`, idle or absolute limit), `requireAdmin()` failed, or `GET /v1/admin/me` answered `401` (a disabled admin's sessions are on the deny-list, so this is also what a disabled admin gets there) |
 | Redirect | `/sign-in?reason=signed_out` | `/sign-in?reason=session_ended&from=<path>` |
 | Notice | `admin.signIn.notice.signedOut` (information) | `admin.signIn.notice.sessionEnded` (information) |
 | After signing in again | The admin home | The page in `from`, if it is an admin path on this site. Otherwise the admin home. |
-| Disabled account | | `ADMIN_DISABLED` shows `error.ADMIN_DISABLED` as an error banner instead, with no `from` |
+| Disabled account | | `403 ADMIN_DISABLED` from `POST /v1/auth/refresh` redirects to `/sign-in?reason=disabled`, which shows `error.ADMIN_DISABLED` as an error banner instead, with no `from` (README, gap G4) |
 
 **The `reason` and `from` parameters are a proposal.** `docs/ARCHITECTURE.md` section 8.3 says the website redirects to the sign-in page, but not how the page learns why, or where to return (see the gap list). `from` holds a path only, never a full address, and is checked against the list of admin paths so it cannot send anyone to another site. It is kept through both steps in the short `mfa` cookie or a similar server-side value, not in the page.
 
@@ -44,7 +44,7 @@ The admin sign-in page (`admin-sign-in.md`), with the notice as an information b
 | --- | --- | --- |
 | Signed out | `reason=signed_out` | Sign-in page with `admin.signIn.notice.signedOut` |
 | Session ended | `reason=session_ended` | Sign-in page with `admin.signIn.notice.sessionEnded` |
-| Disabled | `ADMIN_DISABLED` from refresh or `GET /v1/admin/me` | Sign-in page with the error banner `error.ADMIN_DISABLED` |
+| Disabled | `reason=disabled`, after `403 ADMIN_DISABLED` from refresh | Sign-in page with the error banner `error.ADMIN_DISABLED` |
 | Sign-out could not reach the API | `POST /v1/auth/logout` fails | Cookies are still deleted and the "signed out" notice is shown. The API session ends on its own within its idle limit. |
 | Unknown or missing reason | Any other value | No notice |
 | Signed in again | Both steps succeed | The notice is gone; redirect as in the table above |

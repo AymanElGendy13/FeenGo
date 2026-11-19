@@ -57,7 +57,7 @@ There is no primary button. The code is checked when the sixth digit arrives. Wh
 | Last code went by | During the wait | After the wait |
 | --- | --- | --- |
 | WhatsApp | "Resend code in 0:42" (text, not a button) | Two buttons: "Resend code" (`channel: auto`) and "Send by SMS instead" (`channel: sms`) |
-| SMS | "Resend code in 0:42" | One button: "Send a new code by SMS" (`channel: sms`), because WhatsApp already refused this number |
+| SMS | "Resend code in 0:42" | One button: "Send a new code by SMS" (`channel: sms`). The last code came by SMS either because WhatsApp refused this number or because the person chose SMS, so the next code goes the same way. |
 
 The wait comes from `resendAvailableAt`. The countdown updates once a second on screen, but screen readers are not interrupted by it (see Accessibility).
 
@@ -73,8 +73,8 @@ The wait comes from `resendAvailableAt`. The countdown updates once a second on 
 | Wrong code | `401 OTP_INVALID` with `attemptsRemaining` | Boxes clear, focus returns to the first box, field message `error.OTP_INVALID` with the tries left. A short shake of the boxes, removed when reduce motion is on. |
 | Last try left | `401 OTP_INVALID`, `attemptsRemaining` is 1 | `error.OTP_INVALID.last`, which warns that one more wrong code pauses sign-in |
 | Locked | `423 OTP_LOCKED`, from verify or from a resend | Banner `error.OTP_LOCKED` with the wait from `retryAfterSeconds`. Code boxes and resend actions disabled. One button: `auth.code.action.useAnotherNumber` (sign-in mode) or "Back" (confirm mode). The wait counts down in the banner. When it ends, the banner changes to `auth.code.lockEnded` with a "Send a new code" button. |
-| Expired, noticed by the app | Local timer passes `expiresAt` | Banner `error.OTP_EXPIRED`. Code boxes disabled. The resend actions are shown at once, even if the resend wait has not ended, because the old code is useless. If a resend inside the wait gets `OTP_RESEND_TOO_SOON`, see that row. |
-| Expired, told by the server | `410 OTP_EXPIRED` | Same as above |
+| Expired, noticed by the app | Local timer passes `expiresAt` | Banner `error.OTP_EXPIRED`. The resend actions are shown at once, even if the resend wait has not ended. Until gap G11 is answered, the code boxes stay enabled, because the phone's clock may be wrong; only the server's `410 OTP_EXPIRED` disables them (README, "Times and durations from the server"). If a resend inside the wait gets `OTP_RESEND_TOO_SOON`, see that row. |
+| Expired, told by the server | `410 OTP_EXPIRED` | Banner `error.OTP_EXPIRED`. Code boxes disabled. Resend actions shown at once. |
 | Replaced by a newer code | `409 OTP_ALREADY_USED` | Banner `error.OTP_ALREADY_USED`. Boxes clear and stay enabled, so the latest code can be entered if the app holds the latest challenge. Otherwise the resend actions show. This never counts as a wrong try. |
 | Unknown challenge | `404 OTP_CHALLENGE_NOT_FOUND` | Banner `error.OTP_CHALLENGE_NOT_FOUND`, resend actions shown |
 | Requested on another phone | `403 OTP_DEVICE_MISMATCH` | Banner `error.OTP_DEVICE_MISMATCH`, resend actions shown. A new code is requested from this phone. |
@@ -90,7 +90,7 @@ The wait comes from `resendAvailableAt`. The countdown updates once a second on 
 | App reopened | The app was closed or killed while the person read the code in WhatsApp or Messages | The app keeps the challenge (ID, number, channel, times) in secure storage until `expiresAt`. Reopening the app before then returns to this screen with the countdown correct. After `expiresAt` the stored challenge is deleted. |
 | Largest text | | Boxes switch to one plain field when they no longer fit (README, "Code input"). Text wraps. The resend buttons stack vertically. |
 
-After sign-in, the app compares the account's `language` with the language on the phone. The phone's language wins: if they differ, the app sends `PATCH /v1/me` with the phone's language. This is a proposal (see the gap list in the report). The person sees nothing.
+After sign-in, the app compares the account's `language` with the app's current language. The app's current language wins: if they differ, the app sends `PATCH /v1/me` with it. This is a proposal ([README.md](README.md), gap G10). The person sees nothing.
 
 ## Text
 

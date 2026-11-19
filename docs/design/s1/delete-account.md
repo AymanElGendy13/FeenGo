@@ -78,7 +78,7 @@ Shown when `DELETE /v1/me` answers `403 REAUTH_REQUIRED`.
 | Too many deletions tried | `429 RATE_LIMITED` from `DELETE` | Banner `error.RATE_LIMITED` with the wait |
 | Still needs a recent sign-in after confirming | `403 REAUTH_REQUIRED` again, right after a correct code | Banner `account.delete.error.reauthAgain`. Reported to crash reporting, because this should not happen. |
 | Session ended | `401` after one failed refresh | Sign-in prompt, "session ended" form. After signing in, back here, nothing deleted. |
-| Service down | `503`, `500`, timeout | Banner with the shared message. "Delete my account" works again. A timeout may mean the deletion happened: the app then calls `GET /v1/me`; a `401` there means the account is gone, and the account deleted screen is shown. |
+| Service down | `503`, `500`, timeout | Banner with the shared message. "Delete my account" works again. A timeout may mean the deletion happened, so the app then calls `GET /v1/me`. `200`: not deleted; the banner stays and the person can try again. `401` after one failed refresh: **this does not prove deletion**, because a refresh also fails with `REFRESH_TOKEN_INVALID` when the session expired, was ended, or the server lost its cached successor. The app signs out locally and shows the dialog `account.delete.unsure` instead of the account deleted screen. Only a `204` leads to the account deleted screen. (No endpoint reports whether an account was deleted; noted with gap G17.) |
 | Offline | No connection on "Delete" | Banner `common.offline.message`. Nothing sent. |
 | Largest text | | Scrolls. Dialogs scroll inside. Buttons stack. |
 
@@ -104,6 +104,7 @@ Shown when `DELETE /v1/me` answers `403 REAUTH_REQUIRED`.
 | `account.delete.reauth.action` | Send code | إرسال الرمز | |
 | `account.delete.deleting` | Deleting your account | جارٍ حذف الحساب | Spoken |
 | `account.delete.error.reauthAgain` | We couldn't confirm it's you. Try deleting again. | تعذّر تأكيد الهوية. يُرجى محاولة الحذف مرة أخرى. | |
+| `account.delete.unsure` | We couldn't confirm that your account was deleted, and you've been signed out. If you sign in again with the same number and your profile is empty, the deletion worked. If not, you can delete it again from Account. | تعذّر التأكد من حذف الحساب، وتم تسجيل الخروج. عند تسجيل الدخول مرة أخرى بالرقم نفسه، إذا كان الملف الشخصي فارغًا فقد تم الحذف، وإلا فيمكن حذف الحساب مرة أخرى من صفحة الحساب. | Dialog, with "OK". Rare. |
 | `error.REAUTH_REQUIRED` | Confirm it's you first. | يُرجى تأكيد الهوية أولًا. | Fallback only. Normally the dialog handles this code. |
 
 ## Right-to-left notes
@@ -131,7 +132,7 @@ The person confirms once (the dialog), and proves it is them only when the serve
 - **Dialogs** take focus on their title, are announced as alerts, and return focus to "Delete my account" when cancelled. "Cancel" is the default action, so pressing enter or the hardware back key never deletes.
 - **"Delete my account"** is announced by its words. The destructive colour is not the only signal: the label says what it does.
 - **Focus order:** back, title, warning, banner if any, "What we delete" and its items, "What we keep" and its items, the sign-up line, "Delete my account", "Keep my account".
-- **Touch targets:** buttons at least 48 dp tall, full width.
+- **Touch targets:** the back button is at least 44 by 44 points. Buttons are at least 48 dp tall and full width.
 - **Largest text size:** nothing cut off, dialogs scroll.
 
 ## Review checklist after the build

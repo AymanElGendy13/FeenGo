@@ -18,7 +18,9 @@ Shared patterns are in [README.md](README.md).
 
 The person chooses English or Arabic. The choice applies at once to the whole app, is remembered on the phone, and, when signed in, is saved to the account so that FeenGo's messages (sign-in codes now, notifications from S4) use it (C-03, C-18).
 
-It replaces the language control on the S0 placeholder home. The rules from the S0 spec carry over unchanged: first-launch language, saving on the phone, reading the saved choice before the first frame, and no restart.
+It replaces the language control on the S0 placeholder home. The rules from the S0 spec carry over unchanged: saving on the phone, reading the saved choice before the first frame, and no restart.
+
+**First launch: always English** (`docs/DECISIONS.md`, 2026-11-19). The phone's system language is never followed: a phone set to Arabic still opens FeenGo in English. Only a choice the person makes counts: on this screen, or an explicit change to FeenGo's own per-app language in the phone's settings after the first launch (see Interactions).
 
 | Requirement | How this screen serves it |
 | --- | --- |
@@ -70,7 +72,7 @@ There is no loading or error state on screen, because the change never waits for
 | --- | --- |
 | Tap an option | Applies and saves at once (see States). Tapping the selected option does nothing. |
 | Back | Account, in the chosen language |
-| The phone's per-app language changes (Android 13 and later, iOS Settings) | The app treats it as the person's choice: it applies, saves on the phone and, when signed in, updates the account. When the person chooses here, the app also sets the phone's per-app language where the platform allows, so the two never disagree. How this is done is for mobile-dev. |
+| After the first launch, the person explicitly changes FeenGo's per-app language in the phone's settings (Android 13 and later, iOS Settings) | The app treats this change as the person's choice: it applies, saves on the phone and, when signed in, updates the account. The phone's system language is never treated as a choice, so a phone set to Arabic still opens FeenGo in English at first launch (`docs/DECISIONS.md`, 2026-11-19). When the person chooses here, the app also sets the phone's per-app language where the platform allows, so the two never disagree. How this is done is for mobile-dev. |
 
 ## Accessibility
 
@@ -78,7 +80,7 @@ There is no loading or error state on screen, because the change never waits for
 - The spoken label of "English" is marked as English, and "العربية" as Arabic, so each is read in the right voice.
 - After a change, focus stays on the chosen option, which is announced in the new language.
 - **Focus order:** back, title, English, العربية, explanation.
-- **Touch targets:** each row is full width and at least 48 dp tall.
+- **Touch targets:** the back button is at least 44 by 44 points. Each row is full width and at least 48 dp tall.
 - **Largest text size:** nothing cut off.
 
 ## Review checklist after the build
