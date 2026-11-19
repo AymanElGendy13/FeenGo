@@ -1,0 +1,185 @@
+/*
+ * Segmented control with two options (docs/design/s0/placeholder-home.md). When
+ * the labels no longer fit side by side, for example with the browser's text at
+ * 200%, it becomes a vertical list of radio rows. Tokens only, logical
+ * properties only.
+ */
+
+.switcher {
+  container: language / inline-size;
+}
+
+.group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+/* Floating the legend makes it an ordinary block, aligned to the start. */
+.title {
+  float: inline-start;
+  inline-size: 100%;
+  margin-block-end: var(--spacing-sm);
+  padding: 0;
+  font-size: var(--typography-label-font-size);
+  font-weight: var(--typography-label-font-weight);
+  line-height: var(--typography-label-line-height);
+  text-align: start;
+}
+
+.options {
+  clear: both;
+  display: flex;
+}
+
+/* One segment. The whole segment is the click target; it is at least 48 px tall. */
+.option {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  min-inline-size: 0;
+  min-block-size: var(--size-touch-target-min);
+  padding-block: var(--spacing-xs);
+  padding-inline: var(--spacing-md);
+  border: var(--stroke-outline) solid var(--color-outline);
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+  font-size: var(--typography-label-font-size);
+  font-weight: var(--typography-label-font-weight);
+  line-height: var(--typography-label-line-height);
+  cursor: pointer;
+}
+
+/* Neighbours share one border, which is the divider between segments. */
+.option + .option {
+  border-inline-start-width: 0;
+}
+
+.option:first-child {
+  border-start-start-radius: var(--radius-full);
+  border-end-start-radius: var(--radius-full);
+}
+
+.option:last-child {
+  border-start-end-radius: var(--radius-full);
+  border-end-end-radius: var(--radius-full);
+}
+
+.option:has(.input:checked) {
+  background-color: var(--color-selected);
+  color: var(--color-on-selected);
+}
+
+/* The real radio covers the segment, invisible, so clicks, keyboard and screen readers use it. */
+.input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/*
+ * Focus ring: 2 px in the focus colour, drawn outside the option after a 2 px gap
+ * in the surface colour, so it shows next to a selected fill of the same colour.
+ * The transparent outline is what forced-colours mode draws instead.
+ */
+.option:has(.input:focus-visible) {
+  z-index: 1;
+  outline: var(--stroke-focus-ring) solid transparent;
+  outline-offset: var(--stroke-focus-gap);
+  box-shadow:
+    0 0 0 var(--stroke-focus-gap) var(--color-surface),
+    0 0 0 calc(var(--stroke-focus-gap) + var(--stroke-focus-ring)) var(--color-focus);
+}
+
+/* The check mark at the start of the selected label, so selection never relies on colour alone. */
+.check {
+  display: none;
+  flex: none;
+  inline-size: 1lh;
+  block-size: 1lh;
+}
+
+.option:has(.input:checked) .check {
+  display: block;
+}
+
+.label {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The radio circle exists only in the list layout below. */
+.radio {
+  display: none;
+}
+
+/*
+ * List layout. The threshold is in rem, so it follows the browser's text size:
+ * at the default size both labels fit side by side in a 360 px wide page, and at
+ * 125% or more of the default size the list takes over in a phone-width column.
+ */
+@container language (inline-size < 17rem) {
+  .options {
+    flex-direction: column;
+  }
+
+  .option {
+    flex: none;
+    justify-content: space-between;
+  }
+
+  .option,
+  .option:first-child,
+  .option:last-child {
+    border-radius: 0;
+  }
+
+  .option + .option {
+    border-inline-start-width: var(--stroke-outline);
+    border-block-start-width: 0;
+  }
+
+  .option:first-child {
+    border-start-start-radius: var(--radius-md);
+    border-start-end-radius: var(--radius-md);
+  }
+
+  .option:last-child {
+    border-end-start-radius: var(--radius-md);
+    border-end-end-radius: var(--radius-md);
+  }
+
+  /* Rows are not filled; the radio shows the choice. */
+  .option:has(.input:checked) {
+    background-color: var(--color-surface);
+    color: var(--color-on-surface);
+  }
+
+  .option:has(.input:checked) .check {
+    display: none;
+  }
+
+  .label {
+    text-align: start;
+  }
+
+  .radio {
+    display: block;
+    flex: none;
+    inline-size: 1lh;
+    block-size: 1lh;
+    border: var(--stroke-focus-ring) solid var(--color-outline);
+    border-radius: var(--radius-full);
+  }
+
+  .option:has(.input:checked) .radio {
+    border-color: var(--color-selected);
+    background: radial-gradient(circle, var(--color-selected) 45%, transparent 50%);
+  }
+}

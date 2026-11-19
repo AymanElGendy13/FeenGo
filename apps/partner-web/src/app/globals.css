@@ -1,0 +1,43 @@
+/*
+ * Page-wide rules. Every colour, size and font comes from the design tokens
+ * (@feengo/design-tokens/tokens.css, imported in layout.tsx). Logical properties
+ * only, so Arabic mirrors without extra rules.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /*
+   * next/font/local serves IBM Plex Sans Arabic under a generated family name in
+   * --font-plex-sans-arabic (fonts.ts). It goes first; the token's own family
+   * list follows as the fallback, so the token stays the source of the stack.
+   */
+  font-family: var(--font-plex-sans-arabic), var(--font-family-base);
+  font-weight: var(--font-weight-regular);
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+/* Theme changes crossfade in at most 200 ms, and at once with reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    transition:
+      background-color var(--motion-duration-medium) var(--motion-easing-standard),
+      color var(--motion-duration-medium) var(--motion-easing-standard);
+  }
+}
