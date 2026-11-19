@@ -28,6 +28,11 @@ export default defineConfig([
     '**/build/',
     '**/coverage/',
     '**/.next/',
+    // Playwright output (also in .gitignore).
+    '**/test-results/',
+    '**/playwright-report/',
+    '**/blob-report/',
+    '**/playwright/.cache/',
     // Flutter app: linted by `flutter analyze`, not ESLint.
     'apps/mobile/',
     // Documents only; owned by the architect and others.
