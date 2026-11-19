@@ -125,7 +125,7 @@ FeenGo/
 
 ## 3. S0 increments C1 to C11
 
-Each increment is one pull request that builds, tests and can be merged alone. **The increments are built strictly in this order: each one is merged before the next one starts** (ROADMAP.md). Only design specs and documents for the next slice may be prepared alongside.
+Each increment is one pull request that builds, tests and can be merged alone. **The increments are built in this order: each one is merged before the next one starts** (ROADMAP.md). When an increment is blocked on an owner answer, the next increment that is not blocked may go first, still one at a time (DECISIONS.md, 2026-11-19). In S0 that puts C8 and C9 before C6 and C7, which wait on questions 11 and 12. Only design specs and documents for the next slice may be prepared alongside.
 
 | Inc. | Pull request | Owner | CI job, written by release-manager | What proves it |
 | --- | --- | --- | --- | --- |

@@ -2,6 +2,14 @@
 
 A running log of decisions, newest first. Add an entry whenever something significant is decided, so it is not argued again. Each entry says what was decided and why.
 
+## 2026-11-19: English on first launch and first visit
+
+The app's first launch and a first visit to either website always show English. Arabic is one tap away with the language control, and the choice is remembered. This follows the earlier decision that English is the primary language. Decided by the owner in the conversation, choosing "English always" over following the device or browser language.
+
+## 2026-11-19: A blocked increment may be skipped, one at a time
+
+When the next increment is blocked on an owner answer, the next one that is not blocked may go first. Increments still go one at a time, each merged before the next starts. In S0, C6 (app IDs, question 11) and C7 (Firebase projects, question 12) wait on the owner, so C8 and C9 are built before them. Decided by the owner in the conversation.
+
 ## 2026-11-19: Security override for style-dictionary's glob
 
 style-dictionary 5.8.0 reaches `glob` 13.0.7 and `minimatch` 10.2.6 through `@bundled-es-modules/glob`, both with medium advisories (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249) that fail CI's dependency scan, and no fixed version exists in the ranges it asks for. A scoped pnpm override pins `glob` to 14.0.6 under `@bundled-es-modules/glob` only, which also brings `minimatch` 11. It adds no new package, the token outputs are byte-identical, and the scan stays as strict as before. It is removed once `@bundled-es-modules/glob` depends on a fixed glob, or style-dictionary stops using it. Decided by the owner (ARCHITECTURE question 23).

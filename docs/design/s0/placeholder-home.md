@@ -95,7 +95,7 @@ Builders map these roles to theme colours explicitly. Do not generate a colour s
 | State | What happens |
 | --- | --- |
 | Theme | Always follows the phone's light or dark setting, including live changes while the app is open. Nothing is saved. |
-| First launch, language | Follows the phone's language if it is Arabic or English. Otherwise English. **Owner to confirm** (see "Decision needed" below). |
+| First launch, language | Always English. The person switches to Arabic with the language control, and the choice is remembered. **Decided by the owner on 2026-11-19** (see below). |
 | Before a language is chosen | The app follows the phone's language at each launch. |
 | After a language is chosen | The saved choice wins at every launch, even if the phone's language changes. |
 | Opening | The saved language is read before the first frame is drawn, so the screen never flashes in the wrong language or direction. There is no loading indicator. |
@@ -113,7 +113,9 @@ Builders map these roles to theme colours explicitly. Do not generate a colour s
 - A phone set to Arabic opens the app in Arabic.
 - Any other phone opens it in English.
 
-This is the platform convention, and it suits an Egyptian audience. The alternative is "always English on first launch". Arabic-speaking users would then have to find the switch themselves. The owner chooses one.
+This is the platform convention, and it suits an Egyptian audience. The alternative is "always English on first launch". Arabic-speaking users would then have to find the switch themselves.
+
+**Decided by the owner on 2026-11-19: always English on first launch and first visit** (DECISIONS.md). The proposal above is kept for the record only.
 
 ## Text
 
@@ -203,7 +205,7 @@ The two empty Next.js apps show the same screen, with these differences.
 Both names are provisional and need owner approval.
 
 - **Language and direction:** the page's `lang` and `dir` attributes change with the language. The server sends the right ones from the first byte, so the page never flashes left to right. The choice is remembered in the browser.
-- **First visit:** the language follows the browser's language, with the same rule as the app.
+- **First visit:** always English, as for the app (owner decision, 2026-11-19).
 - **Theme:** follows the browser's `prefers-color-scheme` setting only.
 - **Page title:** uses the name key.
 - **Control:** the language control is a radio group with a visible label. Every option can be reached with the keyboard, and the focus ring follows the same rule as the app.
