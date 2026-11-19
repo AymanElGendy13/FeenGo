@@ -96,7 +96,7 @@ Builders map these roles to theme colours explicitly. Do not generate a colour s
 | --- | --- |
 | Theme | Always follows the phone's light or dark setting, including live changes while the app is open. Nothing is saved. |
 | First launch, language | Always English. The person switches to Arabic with the language control, and the choice is remembered. **Decided by the owner on 2026-11-19** (see below). |
-| Before a language is chosen | The app follows the phone's language at each launch. |
+| Before a language is chosen | English at every launch until a language is chosen. |
 | After a language is chosen | The saved choice wins at every launch, even if the phone's language changes. |
 | Opening | The saved language is read before the first frame is drawn, so the screen never flashes in the wrong language or direction. There is no loading indicator. |
 | Saved choice cannot be read | Use the first-launch rule. No message. Report the failure to crash reporting. |
@@ -106,7 +106,7 @@ Builders map these roles to theme colours explicitly. Do not generate a colour s
 | Landscape and tablets | The same column, centred, at most 480 dp wide, scrolling if needed. |
 | Empty, error, no permission | Not applicable. |
 
-### Decision needed: first-launch language
+### First-launch language (decided 2026-11-19)
 
 `docs/DECISIONS.md` makes English the default language. The proposal above treats "default" as the fallback:
 
@@ -158,7 +158,7 @@ The launch screen and the temporary app icon carry no translatable text.
 | --- | --- |
 | Tap a language option | The whole app switches to that language and direction immediately. The choice is saved on the phone (C-03 groundwork). The screen keeps its scroll position. Tapping the selected option does nothing. |
 | Phone switches between light and dark while the app is open | The app follows at once, with a crossfade of at most 200 ms, or instantly when the phone's reduce-motion setting is on. |
-| Phone's language changes while the app is open | If no language has been saved, the app follows the change at once. |
+| Phone's language changes while the app is open | Nothing: the app ignores the phone's language. |
 | Android back button or gesture | Leaves the app, as the system normally does. |
 | Long press, swipe | Nothing. |
 
