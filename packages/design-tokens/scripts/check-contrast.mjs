@@ -11,11 +11,39 @@ import { PACKAGE_DIR, collectThemes, createStyleDictionary, resolvedTokens } fro
 
 export const PAIRS_FILE = 'contrast-pairs.json';
 
-/** Returns true when every pair passes. Prints a table of results either way. */
+/**
+ * Reads the pairs file. Throws a plain message if it is not JSON or not shaped
+ * as `{ "pairs": [ ... ] }`; validatePairs then checks each pair.
+ */
+export function parsePairsFile(text) {
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`${PAIRS_FILE} is not valid JSON: ${error.message}`, { cause: error });
+  }
+  if (typeof data !== 'object' || data === null || !Array.isArray(data.pairs)) {
+    throw new Error(`${PAIRS_FILE} must be an object with a "pairs" array.`);
+  }
+  return data.pairs;
+}
+
+/**
+ * Returns true when every pair passes. Prints a table of results either way.
+ * Any setup problem (a missing source file, a missing theme, a malformed pairs
+ * file) is printed as one line and returns false, without a stack trace.
+ */
 export async function runContrastCheck() {
-  const { pairs } = JSON.parse(await readFile(PACKAGE_DIR + PAIRS_FILE, 'utf8'));
-  const sd = createStyleDictionary();
-  const { themes } = collectThemes(await resolvedTokens(sd));
+  let pairs;
+  let themes;
+  try {
+    pairs = parsePairsFile(await readFile(PACKAGE_DIR + PAIRS_FILE, 'utf8'));
+    const sd = createStyleDictionary();
+    ({ themes } = collectThemes(await resolvedTokens(sd)));
+  } catch (error) {
+    console.error(`Contrast check failed: ${error.message}`);
+    return false;
+  }
   const { results, problems } = evaluatePairs(themes, pairs);
 
   const rows = [

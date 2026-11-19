@@ -1,6 +1,7 @@
 // Shared Style Dictionary configuration and token helpers for the build and the
 // contrast check (docs/ARCHITECTURE.md section 13).
 
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import StyleDictionary from 'style-dictionary';
 import { parseHex } from './contrast.mjs';
@@ -14,6 +15,20 @@ export const SOURCE_FILES = [
   'tokens/theme.dark.json',
 ];
 
+/** The themes section 13 requires, in output order: light is the default. */
+export const REQUIRED_THEMES = Object.freeze(['light', 'dark']);
+
+/**
+ * Fails if a source file is missing. Style Dictionary skips source paths that
+ * match nothing, so without this a deleted theme file would pass unnoticed.
+ */
+export function assertSourceFiles(packageDir = PACKAGE_DIR) {
+  const missing = SOURCE_FILES.filter((file) => !existsSync(packageDir + file));
+  if (missing.length > 0) {
+    throw new Error(`Token source file missing: ${missing.join(', ')}.`);
+  }
+}
+
 /** Top-level groups that are not exported as they are: the raw palette and the themes. */
 const PALETTE_GROUP = 'color';
 const THEME_GROUP = 'theme';
@@ -23,6 +38,7 @@ const THEME_GROUP = 'theme';
  * the build; the contrast check only reads the resolved tokens.
  */
 export function createStyleDictionary({ formats = {}, platforms } = {}) {
+  assertSourceFiles();
   return new StyleDictionary({
     source: SOURCE_FILES.map((file) => PACKAGE_DIR + file),
     usesDtcg: true,
@@ -41,8 +57,10 @@ export async function resolvedTokens(sd, platform = Object.keys(sd.platforms)[0]
 
 /**
  * Collects the theme roles: `theme.<name>.color.<role>` becomes
- * `{ <name>: { <role>: '#RRGGBB' } }`, in source order. Fails if a value is not
- * an opaque hex colour, or if the themes do not define the same roles.
+ * `{ <name>: { <role>: '#RRGGBB' } }`. Themes come out in REQUIRED_THEMES order
+ * and roles in the light theme's source order, whatever order the files are read
+ * in. Fails if a value is not an opaque hex colour, if the themes are not exactly
+ * REQUIRED_THEMES, or if they do not define the same roles.
  */
 export function collectThemes(allTokens) {
   const themes = {};
@@ -55,27 +73,39 @@ export function collectThemes(allTokens) {
         `Unexpected theme token ${token.path.join('.')}: use theme.<name>.color.<role>.`,
       );
     }
-    parseHex(token.$value);
+    try {
+      parseHex(token.$value);
+    } catch (error) {
+      throw new Error(`${token.path.join('.')}: ${error.message}`, { cause: error });
+    }
     themes[theme] ??= {};
     themes[theme][role] = token.$value.toUpperCase();
     descriptions[role] ??= token.$description;
   }
-  const names = Object.keys(themes);
-  if (names.length === 0) {
-    throw new Error('No theme roles found.');
+  const found = Object.keys(themes);
+  const missingThemes = REQUIRED_THEMES.filter((name) => !found.includes(name));
+  const extraThemes = found.filter((name) => !REQUIRED_THEMES.includes(name));
+  if (missingThemes.length > 0 || extraThemes.length > 0) {
+    throw new Error(
+      `The themes must be exactly ${REQUIRED_THEMES.join(' and ')}. Missing: ${missingThemes.join(', ') || 'none'}. Extra: ${extraThemes.join(', ') || 'none'}.`,
+    );
   }
-  const roles = Object.keys(themes[names[0]]);
-  for (const name of names.slice(1)) {
+  const [first, ...others] = REQUIRED_THEMES;
+  const roles = Object.keys(themes[first]);
+  for (const name of others) {
     const other = Object.keys(themes[name]);
     const missing = roles.filter((r) => !other.includes(r));
     const extra = other.filter((r) => !roles.includes(r));
     if (missing.length > 0 || extra.length > 0) {
       throw new Error(
-        `Theme ${name} must define the same roles as ${names[0]}. Missing: ${missing.join(', ') || 'none'}. Extra: ${extra.join(', ') || 'none'}.`,
+        `Theme ${name} must define the same roles as ${first}. Missing: ${missing.join(', ') || 'none'}. Extra: ${extra.join(', ') || 'none'}.`,
       );
     }
   }
-  return { themes, roles, descriptions };
+  const ordered = Object.fromEntries(
+    REQUIRED_THEMES.map((name) => [name, Object.fromEntries(roles.map((r) => [r, themes[name][r]]))]),
+  );
+  return { themes: ordered, roles, descriptions };
 }
 
 /** Tokens exported as they are: everything except the raw palette and the themes. */
