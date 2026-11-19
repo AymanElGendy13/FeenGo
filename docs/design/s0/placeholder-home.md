@@ -108,7 +108,7 @@ Builders map these roles to theme colours explicitly. Do not generate a colour s
 
 ### First-launch language (decided 2026-11-19)
 
-`docs/DECISIONS.md` makes English the default language. The proposal above treats "default" as the fallback:
+`docs/DECISIONS.md` makes English the default language. The original proposal treated "default" as the fallback:
 
 - A phone set to Arabic opens the app in Arabic.
 - Any other phone opens it in English.
