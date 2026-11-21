@@ -2,6 +2,18 @@
 
 A running log of decisions, newest first. Add an entry whenever something significant is decided, so it is not argued again. Each entry says what was decided and why.
 
+## 2026-11-19: App ID com.feengo.app
+
+The customer app uses the application ID and bundle ID `com.feengo.app` on Android and iPhone. It is hard to change after the first store upload. Decided by the owner (ARCHITECTURE question 11; the domain is still open).
+
+## 2026-11-19: Analytics postponed
+
+The Firebase analytics test event (C7) is postponed: the Flutter app shell (C6) is built without Firebase, and C7 is added later. S0 is not done until C7 lands. Decided by the owner, choosing "Skip analytics for now" (ARCHITECTURE question 12).
+
+## 2026-11-19: iOS CI postponed
+
+The iOS build in CI (C10) is postponed until the owner asks for it; the owner is not sure it is needed in this phase. Linux jobs still build every app on every push. Decided by the owner (ARCHITECTURE question 16).
+
 ## 2026-11-19: English on first launch and first visit
 
 The app's first launch and a first visit to either website always show English. Arabic is one tap away with the language control, and the choice is remembered. This follows the earlier decision that English is the primary language. Decided by the owner in the conversation, choosing "English always" over following the device or browser language.
