@@ -1,0 +1,29 @@
+{
+  "partner": {
+    "app": {
+      "name": "FeenGo للشركاء"
+    }
+  },
+  "home": {
+    "placeholder": {
+      "welcome": "أهلًا وسهلًا. أماكن للأكل والسهر والاحتفال قريبًا."
+    }
+  },
+  "settings": {
+    "language": {
+      "title": "اللغة",
+      "option": {
+        "en": "English",
+        "ar": "العربية"
+      }
+    }
+  },
+  "error": {
+    "notFound": {
+      "title": "الصفحة غير موجودة",
+      "body": "هذه الصفحة غير موجودة أو تم نقلها.",
+      "home": "الذهاب إلى الصفحة الرئيسية",
+      "pageTitle": "{title} – {appName}"
+    }
+  }
+}

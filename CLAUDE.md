@@ -73,4 +73,5 @@ Keep this section updated as the project grows.
 - Backend: `pnpm --filter @feengo/api start:dev`. Checks: `pnpm --filter @feengo/api lint`, `typecheck`, `test` (the tests need the local services running)
 - Database: `pnpm --filter @feengo/api db:migrate` (latest), `db:migrate:down-all` (local and test only), `db:types` (regenerates `apps/api/src/database/schema.generated.ts`; export `DATABASE_MIGRATOR_URL` first). Commit the regenerated types; CI fails if they are stale
 - Mobile: `cd apps/mobile && flutter run`
-- Dashboards: `cd apps/partner-web && npm run dev`, `cd apps/admin-web && npm run dev`
+- Partner dashboard: `pnpm --filter @feengo/partner-web dev` (port 3001). Checks: `lint`, `typecheck`, `i18n:check` (English and Arabic keys match), `test`, `build`, then `test:e2e` (needs `build` first; locally set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` if Playwright's own Chromium is missing)
+- Admin back office: `cd apps/admin-web` (arrives in C9)

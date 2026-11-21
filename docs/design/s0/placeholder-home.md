@@ -104,7 +104,7 @@ Builders map these roles to theme colours explicitly. Do not generate a colour s
 | Offline | Works fully. Nothing on this screen needs a connection, so there is no offline banner. |
 | Largest text size | The column scrolls. The control switches to the vertical list where needed (see "Large text fallback"). |
 | Landscape and tablets | The same column, centred, at most 480 dp wide, scrolling if needed. |
-| Empty, error, no permission | Not applicable. |
+| Empty, error, no permission | Not applicable in the app. The web variant has a not-found state (see "Not-found state" under the web variant). Empty, other errors and no permission are not applicable there either. |
 
 ### First-launch language (decided 2026-11-19)
 
@@ -210,3 +210,29 @@ Both names are provisional and need owner approval.
 - **Page title:** uses the name key.
 - **Control:** the language control is a radio group with a visible label. Every option can be reached with the keyboard, and the focus ring follows the same rule as the app.
 - **Width and zoom:** the column is at most 480 px wide and centred. The large-text fallback applies when the browser's text is zoomed to 200%.
+
+### Not-found state (web, both dashboards)
+
+**Provisional: needs owner approval,** like the rest of this spec. It replaces the framework's built-in English 404 page, which breaks the bilingual, token-colour and logical-direction rules.
+
+Shown for any address that has no page. The server answers with HTTP status 404.
+
+- **Layout:** the same placeholder layout and colour roles as the home page, top to bottom: the app name heading (its name key, unchanged), the not-found title, the body line, the home link, then the language section and control. Spacing as on the home page: title 8 px below the app name, body 8 px below the title, link 16 px below the body, language section 48 px below the link. Logical properties only (start and end), no left or right.
+- **Type:** the not-found title uses the Body size with Medium weight, in `onSurface` (the type tokens have no 18 px step; a new step would be a design-system change). The body uses the Body style in `onSurface`.
+- **Home link:** yes, one link to the dashboard's home page, `/`. It is the one primary action. It is a text link in `onSurface`, underlined so it is never shown by colour alone, at least 44 by 44 px as a target, with the same focus ring rule.
+- **Language control:** kept, and works as on the home page. Switching it keeps the person on the not-found page.
+- **`lang` and `dir`:** follow the saved language, sent by the server from the first byte, as on the home page. First visit is English.
+- **Theme:** follows `prefers-color-scheme`, as on the home page.
+
+| Key | English | Arabic (needs owner review) | Notes |
+| --- | --- | --- | --- |
+| `error.notFound.title` | Page not found | الصفحة غير موجودة | Also the first part of the page title |
+| `error.notFound.body` | This page doesn't exist or has moved. | هذه الصفحة غير موجودة أو تم نقلها. | Passive, so gender-neutral |
+| `error.notFound.home` | Go to the home page | الذهاب إلى الصفحة الرئيسية | Verbal noun, not an imperative, so gender-neutral |
+
+**Accessibility**
+
+- **One `h1`:** the app name stays the page's only `h1`, as on the home page. The not-found title is an `h2`.
+- **Page title:** one message, `error.notFound.pageTitle` = "{title} – {appName}" in both languages, filled with `error.notFound.title` and the name key, so no text or punctuation is written in code. For example "Page not found – FeenGo Partner" and "الصفحة غير موجودة – FeenGo للشركاء".
+- **Reading and focus order:** app name, title, body, home link, language title, English, العربية.
+- The link's accessible name is its visible text.

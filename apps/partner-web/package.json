@@ -1,0 +1,42 @@
+{
+  "name": "@feengo/partner-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FeenGo partner dashboard: the Next.js website venues use to manage their profile, bookings and event quotes.",
+  "type": "module",
+  "engines": {
+    "node": ">=26.13.1 <27"
+  },
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "node scripts/start-standalone.ts",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "i18n:check": "node scripts/check-messages.ts"
+  },
+  "dependencies": {
+    "@feengo/design-tokens": "workspace:*",
+    "next": "16.4.6",
+    "next-intl": "4.15.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "eslint-config-next": "16.4.6",
+    "jsdom": "31.0.1",
+    "typescript": "6.0.3",
+    "vite": "8.3.8",
+    "vitest": "4.1.12"
+  }
+}

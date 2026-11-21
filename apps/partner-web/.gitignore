@@ -1,0 +1,9 @@
+# Next.js: build output and the type file it regenerates on every dev and build run.
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# Playwright run output. The design-review screenshots (screenshots/) are
+# ignored by the root .gitignore (apps/*/screenshots/).
+test-results/
+playwright-report/

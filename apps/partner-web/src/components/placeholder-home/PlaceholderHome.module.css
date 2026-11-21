@@ -1,0 +1,8 @@
+/* The welcome line, 8 px below the app name. Tokens only, logical properties only. */
+.welcome {
+  margin-block: var(--spacing-sm) 0;
+  font-size: var(--typography-body-font-size);
+  font-weight: var(--typography-body-font-weight);
+  line-height: var(--typography-body-line-height);
+  text-align: center;
+}

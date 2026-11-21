@@ -772,6 +772,7 @@ apps/mobile/
 - **Language:** next-intl without locale prefixes in the URL. The choice is kept in a cookie, English by default; the root layout sets `<html lang dir>` on the server, so there is no flash of the wrong direction.
 - **Data:** server components fetch through a typed client generated from `openapi.yaml` (openapi-typescript and openapi-fetch, S1 onwards). Browser code never calls the API directly.
 - **Partner dashboard** works at 360 pixels wide first; the back office is desktop first but must still work on a tablet.
+- **Language cookie and CSP (accepted in the C8 review):** the language cookie `__Host-feengo_locale` (HttpOnly, Secure, Path=/, one year) uses `SameSite=Lax`, so a link from another site still opens in the chosen language; section 8.3's `Strict` applies only to the session cookies. The Content-Security-Policy in S0 is partial (`frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'`); a full script and style policy, with per-request nonces through `proxy.ts`, comes in S2.
 
 ## 13. Design tokens
 
@@ -1105,6 +1106,11 @@ ts-jest 29.4.15 accepts TypeScript below 7, so it works with TypeScript 6.0.3. N
 ### 18.8 CI tools (release-manager, C3, and C10 if it comes back)
 
 GitHub Actions maintained by GitHub (`actions/checkout`, `actions/setup-node`, `actions/cache`), `pnpm/action-setup`, `subosito/flutter-action` for Flutter, and Google's `osv-scanner` action for the dependency scan of both npm and pub packages. release-manager pins each to a full commit SHA in C3 and lists them in the pull request.
+
+Added in C8 for the partner-web job, each pinned by full commit SHA:
+
+- `actions/upload-artifact` `cf430e030ddbb5b0abf93d22962f4752f3646cd9` (v7.0.2): uploads the Playwright screenshots, and later the Android APK.
+- `actions/cache` `55cc8345863c7cc4c66a329aec7e433d2d1c52a9` (v6.1.0): also caches the Playwright browsers.
 
 ## 19. Environments, configuration and secrets
 

@@ -18,6 +18,16 @@ dist/
 build/
 coverage/
 
+# Playwright output: reports, traces, and the screenshots and diffs of failed
+# tests. Committed baseline screenshots live in *-snapshots/ and are not ignored.
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+# Design-review screenshots the websites' Playwright tests write. Scoped to apps/
+# so store/ listing screenshots stay committed.
+apps/*/screenshots/
+
 # Flutter
 .dart_tool/
 .flutter-plugins

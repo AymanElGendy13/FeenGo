@@ -284,12 +284,92 @@ jobs:
           fi
           echo "Committed outputs match the build."
 
+  partner-web:
+    name: Partner web (lint, type check, translations, tests, build, Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm (version from packageManager)
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # The website and its workspace dependencies (design tokens) only.
+      - name: Install (partner web only)
+        run: pnpm install --frozen-lockfile --filter @feengo/partner-web...
+
+      - name: Lint
+        run: pnpm --filter @feengo/partner-web lint
+
+      - name: Type check
+        run: pnpm --filter @feengo/partner-web typecheck
+
+      # Every English key has an Arabic one, and the other way round.
+      - name: Translation check
+        run: pnpm --filter @feengo/partner-web i18n:check
+
+      - name: Unit tests
+        run: pnpm --filter @feengo/partner-web test
+
+      - name: Build (next build)
+        run: pnpm --filter @feengo/partner-web build
+
+      # The browser cache is keyed on the installed Playwright version, so it
+      # changes only when @playwright/test is upgraded.
+      - name: Read the Playwright version
+        id: playwright
+        run: |
+          version="$(pnpm --filter @feengo/partner-web exec playwright --version | sed -E 's/^Version //')"
+          echo "Playwright $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium
+
+      # The system libraries are not cached, so --with-deps installs them every
+      # run; the browser download is skipped when the cache restored it.
+      - name: Install Playwright Chromium
+        run: pnpm --filter @feengo/partner-web exec playwright install --with-deps chromium
+
+      # Placeholder page in English and Arabic, with screenshots (C8).
+      - name: Playwright smoke test
+        run: pnpm --filter @feengo/partner-web test:e2e
+
+      # The screenshots taken for design review (screenshots/, both languages),
+      # and on a failure whatever Playwright wrote to test-results/ (screenshots,
+      # error context). Uploaded on success too, because the screenshots are a
+      # few small images. playwright-report/ is listed in case an HTML reporter
+      # is added later. Kept for seven days.
+      - name: Upload the Playwright screenshots and results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: partner-web-playwright
+          path: |
+            apps/partner-web/screenshots/
+            apps/partner-web/test-results/
+            apps/partner-web/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
   ci-summary:
     name: CI passed (${{ github.event_name }})
     if: always()
     # Every job in this workflow must be listed here, or its failure would not
     # block the merge.
-    needs: [api, contract, design-tokens, security]
+    needs: [api, contract, design-tokens, partner-web, security]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

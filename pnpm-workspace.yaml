@@ -39,3 +39,11 @@ minimumReleaseAgeExclude:
 # depends on a fixed glob, or style-dictionary stops using it.
 overrides:
   "@bundled-es-modules/glob>glob": "14.0.6"
+
+# Install scripts (C8): pnpm 12 stops on any dependency install script that is not
+# explicitly allowed or denied. @parcel/watcher (through next-intl) and @swc/core
+# (through next-intl and @nestjs/cli) ship prebuilt native binaries as optional packages,
+# so their install scripts are not needed and are denied.
+allowBuilds:
+  "@parcel/watcher": false
+  "@swc/core": false

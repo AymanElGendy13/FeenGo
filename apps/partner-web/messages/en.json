@@ -1,0 +1,29 @@
+{
+  "partner": {
+    "app": {
+      "name": "FeenGo Partner"
+    }
+  },
+  "home": {
+    "placeholder": {
+      "welcome": "Welcome. Places to eat, go out and celebrate are coming soon."
+    }
+  },
+  "settings": {
+    "language": {
+      "title": "Language",
+      "option": {
+        "en": "English",
+        "ar": "العربية"
+      }
+    }
+  },
+  "error": {
+    "notFound": {
+      "title": "Page not found",
+      "body": "This page doesn't exist or has moved.",
+      "home": "Go to the home page",
+      "pageTitle": "{title} – {appName}"
+    }
+  }
+}
