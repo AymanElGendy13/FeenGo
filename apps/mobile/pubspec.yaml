@@ -1,0 +1,36 @@
+name: feengo_app
+description: FeenGo customer app.
+publish_to: 'none'
+
+# Version name and build number for the stores. Raised by release-manager.
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.14.0
+  flutter: '>=3.50.0'
+
+# Exact versions from docs/ARCHITECTURE.md section 18.5 (C6 rows only).
+# Ask before adding anything here.
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
+  feengo_design_tokens:
+    path: ../../packages/design-tokens/flutter
+  flutter_riverpod: 3.5.0
+  go_router: 18.1.4
+  shared_preferences: 2.5.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: 6.0.0
+
+flutter:
+  # Bundles the Material icons font, for the check mark of the selected
+  # language option.
+  uses-material-design: true
+  # Runs gen-l10n from l10n.yaml on pub get, run, build and test.
+  generate: true

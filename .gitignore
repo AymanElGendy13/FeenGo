@@ -32,6 +32,9 @@ apps/*/screenshots/
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
+# Images flutter test writes when a golden test fails. Committed goldens are not
+# in failures/ folders.
+apps/mobile/test/**/failures/
 
 # OS and editors
 .DS_Store

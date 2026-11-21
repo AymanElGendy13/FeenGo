@@ -1,0 +1,10 @@
+# Flutter gen-l10n (docs/ARCHITECTURE.md section 14). The generated files are
+# committed, already formatted, so CI sees no change after pub get.
+# The untranslated-messages file is not set here: CI passes
+# --untranslated-messages-file and fails if it lists anything.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+nullable-getter: false
+format: true

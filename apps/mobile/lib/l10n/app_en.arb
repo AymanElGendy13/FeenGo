@@ -1,0 +1,23 @@
+{
+  "@@locale": "en",
+  "appName": "FeenGo",
+  "@appName": {
+    "description": "Key app.name. The app's name, shown as the heading of the placeholder home. Provisional; the Arabic name is to be confirmed."
+  },
+  "homePlaceholderWelcome": "Welcome. Places to eat, go out and celebrate are coming soon.",
+  "@homePlaceholderWelcome": {
+    "description": "Key home.placeholder.welcome. Welcome line under the app name on the S0 placeholder home."
+  },
+  "settingsLanguageTitle": "Language",
+  "@settingsLanguageTitle": {
+    "description": "Key settings.language.title. Title of the language section, and the accessible name of the language control."
+  },
+  "settingsLanguageOptionEn": "English",
+  "@settingsLanguageOptionEn": {
+    "description": "Key settings.language.option.en. Always written in English, never translated."
+  },
+  "settingsLanguageOptionAr": "العربية",
+  "@settingsLanguageOptionAr": {
+    "description": "Key settings.language.option.ar. Always written in Arabic, never translated."
+  }
+}

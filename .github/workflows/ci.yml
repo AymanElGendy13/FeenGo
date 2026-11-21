@@ -219,21 +219,23 @@ jobs:
           persist-credentials: false
 
       # Fails the job when a known vulnerability is found, or when the scan
-      # itself fails. Later increments add their lockfiles here (pubspec.lock
-      # with the app in C6).
+      # itself fails. Scans every lockfile: pnpm-lock.yaml (npm packages) and
+      # apps/mobile/pubspec.lock (pub packages, from C6). Later lockfiles are
+      # added here too.
       #
       # The image that google/osv-scanner-action/osv-scanner-action v2.7.1 runs,
       # pinned by digest because its tag can move: ghcr.io/google/osv-scanner-action
       # v2.7.1. Its entrypoint, exit_code_redirect.sh, treats "no lockfiles found"
       # (exit 128) as a pass unless --allow-no-lockfiles=false is given, so it is.
       # The script only sees that flag when it is the one argument before the last,
-      # so a second lockfile (C6) needs the arguments rearranged, not just appended.
+      # so it stays second to last: further lockfiles go before it, never after
+      # the last one.
       - name: Scan lockfiles
         uses: docker://ghcr.io/google/osv-scanner-action@sha256:3fa25659351c9a5527b30d73b6f3c2ee0bcac106d6220948211d87379d08f243 # v2.7.1
         env:
           GOTOOLCHAIN: auto
         with:
-          args: --allow-no-lockfiles=false --lockfile=./pnpm-lock.yaml
+          args: --lockfile=./pnpm-lock.yaml --allow-no-lockfiles=false --lockfile=./apps/mobile/pubspec.lock
 
   design-tokens:
     name: Design tokens (tests, build, contrast check, stale outputs)
@@ -364,12 +366,127 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  mobile:
+    name: Mobile (translations, format, analyze, tests and goldens, Android debug build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Gradle needs a JDK for the Android build. Its cache covers the Gradle
+      # dependencies and the Gradle wrapper, keyed on the app's Gradle files.
+      - name: Set up Java 17 (with the Gradle cache)
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            apps/mobile/android/*.gradle*
+            apps/mobile/android/app/*.gradle*
+            apps/mobile/android/gradle.properties
+            apps/mobile/android/gradle/wrapper/gradle-wrapper.properties
+
+      # cache: true caches the Flutter SDK and, by default, the pub cache too
+      # (keyed on every pubspec.lock in the repository).
+      - name: Set up Flutter 3.50.0
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.50.0
+          channel: stable
+          cache: true
+
+      - name: Show the Flutter version
+        run: flutter --version
+
+      # Fails if pubspec.lock does not match pubspec.yaml, like pnpm's
+      # --frozen-lockfile.
+      - name: Install packages
+        run: flutter pub get --enforce-lockfile
+
+      # Every English message has an Arabic one (section 14). The untranslated
+      # messages file goes to the runner's temp folder, so it never shows up in
+      # the checkout. gen-l10n writes "{}" when nothing is missing; a missing
+      # file also fails, so the check can never pass by being skipped.
+      - name: Generate translations and check none are missing
+        env:
+          UNTRANSLATED: ${{ runner.temp }}/untranslated-messages.json
+        run: |
+          flutter gen-l10n --untranslated-messages-file="$UNTRANSLATED"
+          if [ ! -f "$UNTRANSLATED" ]; then
+            echo "::error::gen-l10n wrote no untranslated-messages file at $UNTRANSLATED. If l10n.yaml sets untranslated-messages-file, remove it there so CI's path is used."
+            exit 1
+          fi
+          content="$(tr -d '[:space:]' < "$UNTRANSLATED")"
+          if [ -n "$content" ] && [ "$content" != "{}" ]; then
+            echo "Untranslated messages:"
+            cat "$UNTRANSLATED"
+            echo "::error::Some messages have no translation. Add them to every ARB file in apps/mobile/lib/l10n."
+            exit 1
+          fi
+          echo "Every message is translated."
+
+      # pub get and gen-l10n must leave the app exactly as committed: an
+      # unchanged pubspec.lock, committed generated files up to date, and
+      # anything generated but not committed covered by a .gitignore.
+      - name: Check the checkout is unchanged
+        run: |
+          changes="$(git status --porcelain --untracked-files=all -- .)"
+          if [ -n "$changes" ]; then
+            echo "Changed or new files after pub get and gen-l10n:"
+            echo "$changes"
+            git diff --stat -- .
+            echo "::error::Run 'flutter pub get' and 'flutter gen-l10n' in apps/mobile and commit the result, or ignore generated files that are not committed."
+            exit 1
+          fi
+          echo "The checkout is unchanged."
+
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze
+        run: flutter analyze
+
+      # Widget and golden tests in both languages and themes. Goldens are made
+      # and compared on Linux only (section 16), so this job is where they run.
+      - name: Tests (including goldens)
+        run: flutter test
+
+      # Unsigned debug build of the dev flavor, uploaded for testers to sideload.
+      - name: Build the Android debug APK (dev flavor)
+        run: flutter build apk --debug --flavor dev -t lib/main_dev.dart --dart-define-from-file=config/dev.json
+
+      - name: Upload the Android debug APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: feengo-dev-debug-apk
+          path: apps/mobile/build/app/outputs/flutter-apk/app-dev-debug.apk
+          retention-days: 7
+          if-no-files-found: error
+
+      # On a failed golden test, flutter test writes the images it compared to
+      # test/**/failures/. Uploaded only on failure, so the diff can be seen.
+      - name: Upload golden test failures
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mobile-golden-failures
+          path: apps/mobile/test/**/failures/
+          retention-days: 7
+          if-no-files-found: ignore
+
   ci-summary:
     name: CI passed (${{ github.event_name }})
     if: always()
     # Every job in this workflow must be listed here, or its failure would not
     # block the merge.
-    needs: [api, contract, design-tokens, partner-web, security]
+    needs: [api, contract, design-tokens, mobile, partner-web, security]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
