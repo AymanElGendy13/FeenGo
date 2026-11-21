@@ -22,7 +22,8 @@
     "notFound": {
       "title": "Page not found",
       "body": "This page doesn't exist or has moved.",
-      "home": "Go to the home page"
+      "home": "Go to the home page",
+      "pageTitle": "{title} – {appName}"
     }
   }
 }
