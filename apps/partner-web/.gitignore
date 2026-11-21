@@ -3,8 +3,7 @@
 next-env.d.ts
 *.tsbuildinfo
 
-# Playwright: run output, and the screenshots taken for design review. The
-# screenshots are not golden images and are never committed.
+# Playwright run output. The design-review screenshots (screenshots/) are
+# ignored by the root .gitignore (apps/*/screenshots/).
 test-results/
 playwright-report/
-screenshots/

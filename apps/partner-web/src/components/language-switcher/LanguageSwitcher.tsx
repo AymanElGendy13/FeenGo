@@ -31,7 +31,13 @@ export function LanguageSwitcher({ locale, title, options }: LanguageSwitcherPro
     // choosing the current language does nothing.
     startTransition(async () => {
       setShownLocale(next);
-      await setLocale(next);
+      try {
+        await setLocale(next);
+      } catch {
+        // Offline, a server error, or an action ID from an older deploy. Keep the
+        // page and its current language: when the transition ends, useOptimistic
+        // returns to the language the server rendered. The spec asks for no message.
+      }
     });
   }
 
