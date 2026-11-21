@@ -79,6 +79,8 @@ The count is an estimate of distinct screens. Sheets and dialogs that need their
 | Admin | Activity log: list with filters | A-11 |
 | Admin | Activity log entry detail | A-11 |
 
+Draft specs for these screens, with the owner decisions each one waits on: [`docs/design/s1/README.md`](s1/README.md).
+
 ### S2 Venue onboarding: about 23 screens (dashboard 14, admin 9)
 
 | Product | Screen | Requirement IDs |

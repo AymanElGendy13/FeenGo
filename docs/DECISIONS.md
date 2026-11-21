@@ -2,6 +2,26 @@
 
 A running log of decisions, newest first. Add an entry whenever something significant is decided, so it is not argued again. Each entry says what was decided and why.
 
+## 2026-11-21: S0 done without C10
+
+S0 counts as done without the iOS build in CI (C10); ROADMAP's done-check is otherwise unchanged. The iPhone side is shown by the owner's run on a real iPhone through Xcode. The analytics test event (C7) is still needed (entry of 2026-11-19). C10 can be added later. Why: the owner is not sure iOS CI is needed in this phase, and the run on a real iPhone shows that the app builds and runs on iOS. Decided by the owner, choosing "Done without C10".
+
+## 2026-11-21: Keep checking everything (no path filters)
+
+Every push and every pull request runs every Linux CI job for every app. No path filters: no job is skipped because its app did not change. Why: it follows ROADMAP.md's "builds all four apps on every push and pull request", and nothing is left unchecked. Decided by the owner, choosing "Keep checking everything" (ARCHITECTURE question 16).
+
+## 2026-11-19: App ID com.feengo.app
+
+The customer app uses the application ID and bundle ID `com.feengo.app` on Android and iPhone. It is hard to change after the first store upload. Decided by the owner (ARCHITECTURE question 11; the domain is still open).
+
+## 2026-11-19: Analytics postponed
+
+The Firebase analytics test event (C7) is postponed: the Flutter app shell (C6) is built without Firebase, and C7 is added later. S0 is not done until C7 lands. Decided by the owner, choosing "Skip analytics for now" (ARCHITECTURE question 12).
+
+## 2026-11-19: iOS CI postponed
+
+The iOS build in CI (C10) is postponed; the owner is not sure it is needed in this phase. Decided by the owner (ARCHITECTURE question 16, iOS part).
+
 ## 2026-11-19: English on first launch and first visit
 
 The app's first launch and a first visit to either website always show English. Arabic is one tap away with the language control, and the choice is remembered. This follows the earlier decision that English is the primary language. Decided by the owner in the conversation, choosing "English always" over following the device or browser language.
