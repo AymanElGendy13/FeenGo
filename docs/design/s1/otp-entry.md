@@ -152,6 +152,7 @@ Also used: `error.ACCOUNT_SUSPENDED`, `auth.phone.error.rateLimited`, the shared
 | Back, system back or swipe back | Sign-in mode: to phone entry, as "Change number". Confirm mode: to delete account, nothing deleted. |
 | Signed in, new account | Complete profile replaces this screen, so back does not return here |
 | Signed in, existing account | The whole flow closes and the app returns to `from` (C-01). A snackbar is not shown; arriving where they were is enough. |
+| Signed in, with an "unsure deletion" record for this number | Before anything else, the app follows `delete-account.md`, "Unsure deletion", using `isNewCustomer` |
 
 **Autofill and paste**
 

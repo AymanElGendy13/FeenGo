@@ -105,8 +105,8 @@ Arabic copy needs owner review, including the voice (plan decision 6) and the di
 | `auth.phone.title` | Sign in or create an account | تسجيل الدخول أو إنشاء حساب | Heading |
 | `auth.phone.body` | We'll send a code to your mobile by WhatsApp, or by SMS if WhatsApp can't deliver it. | سنرسل رمزًا إلى رقم الهاتف المحمول عبر واتساب، أو برسالة نصية إذا تعذّر الإرسال عبر واتساب. | |
 | `auth.phone.field.label` | Mobile number | رقم الهاتف المحمول | |
-| `auth.phone.field.prefixLabel` | Egypt, {dialCode} | مصر، {dialCode} | Spoken label of the fixed prefix (Q7 yes). `{dialCode}` is "+20", formatted by the number formatter, as a left-to-right isolate. |
-| `auth.phone.field.helperEg` | Egyptian mobile number, for example {example} | رقم هاتف محمول مصري، مثل {example} | Q7 yes. `{example}` is a sample number (010 1234 5678) formatted by the number formatter in the chosen digit set, as a left-to-right isolate. |
+| `auth.phone.field.prefixLabel` | Egypt, {dialCode} | مصر، {dialCode} | Spoken label of the fixed prefix (Q7 yes). `{dialCode}` is "+20", a digit string: each digit converted to the chosen digit set (README, "Digits"), as a left-to-right isolate. |
+| `auth.phone.field.helperEg` | Egyptian mobile number, for example {example} | رقم هاتف محمول مصري، مثل {example} | Q7 yes. `{example}` is a sample number (010 1234 5678), a digit string: each digit converted to the chosen digit set, spaces kept, as a left-to-right isolate. |
 | `auth.phone.field.helperIntl` | Choose your country, then enter your number | يُرجى اختيار الدولة ثم إدخال الرقم | Q7 no |
 | `auth.phone.field.countryButton` | Country: {country}, {code} | الدولة: {country}، {code} | Q7 no. Spoken label. |
 | `auth.phone.action.send` | Send code | إرسال الرمز | Primary button |
@@ -117,7 +117,7 @@ Arabic copy needs owner review, including the voice (plan decision 6) and the di
 | `legal.terms.title` | Terms of use | شروط الاستخدام | Link text |
 | `legal.privacy.title` | Privacy policy | سياسة الخصوصية | Link text |
 | `auth.phone.error.empty` | Enter your mobile number. | يُرجى إدخال رقم الهاتف المحمول. | |
-| `auth.phone.error.incomplete` | This number is too short. Enter all {length} digits, starting with {start}. | هذا الرقم قصير. يُرجى إدخال الأرقام الـ {length} كاملة، بدءًا بـ {start}. | Q7 yes. `{length}` (11) and `{start}` (01) are filled by the number formatter, `{start}` as a left-to-right isolate. Under Q7 no, a per-country message. |
+| `auth.phone.error.incomplete` | This number is too short. Enter all {length} digits, starting with {start}. | هذا الرقم قصير. يُرجى إدخال الأرقام الـ {length} كاملة، بدءًا بـ {start}. | Q7 yes. `{length}` (11) is a count, filled by the number formatter. `{start}` (01) is a digit string: each digit converted to the chosen digit set, as a left-to-right isolate. Under Q7 no, a per-country message. |
 | `error.PHONE_INVALID` | This isn't a mobile number we can send a code to. Check it and try again. | لا يمكن إرسال رمز إلى هذا الرقم لأنه ليس رقم هاتف محمول صالحًا. يُرجى التحقق منه والمحاولة مرة أخرى. | |
 | `error.PHONE_COUNTRY_NOT_SUPPORTED` | For now, FeenGo works with Egyptian mobile numbers only. Enter a number that starts with {dialCode}. | يعمل FeenGo حاليًا مع أرقام الهواتف المحمولة المصرية فقط. يُرجى إدخال رقم يبدأ بـ {dialCode}. | `{dialCode}` as in `auth.phone.field.prefixLabel`. Depends on Q7 and the `auth.otp.allowed_country_codes` setting. If more countries are allowed later, this copy changes. |
 | `auth.phone.error.resendTooSoon` | We sent a code to this number a moment ago. You can ask for a new one in {duration}. | أرسلنا رمزًا إلى هذا الرقم قبل قليل. يمكن طلب رمز جديد بعد {duration}. | |

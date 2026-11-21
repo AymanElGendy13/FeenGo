@@ -78,7 +78,9 @@ Shown when `DELETE /v1/me` answers `403 REAUTH_REQUIRED`.
 | Too many deletions tried | `429 RATE_LIMITED` from `DELETE` | Banner `error.RATE_LIMITED` with the wait |
 | Still needs a recent sign-in after confirming | `403 REAUTH_REQUIRED` again, right after a correct code | Banner `account.delete.error.reauthAgain`. Reported to crash reporting, because this should not happen. |
 | Session ended | `401` after one failed refresh | Sign-in prompt, "session ended" form. After signing in, back here, nothing deleted. |
-| Service down | `503`, `500`, timeout | Banner with the shared message. "Delete my account" works again. A timeout may mean the deletion happened, so the app then calls `GET /v1/me`. `200`: not deleted; the banner stays and the person can try again. `401` after one failed refresh: **this does not prove deletion**, because a refresh also fails with `REFRESH_TOKEN_INVALID` when the session expired, was ended, or the server lost its cached successor. The app signs out locally and shows the dialog `account.delete.unsure` instead of the account deleted screen. Only a `204` leads to the account deleted screen. (No endpoint reports whether an account was deleted; noted with gap G17.) |
+| Service down | `503`, `500`, timeout | Banner with the shared message. "Delete my account" works again. A timeout may mean the deletion happened, so the app then calls `GET /v1/me`. `200`: not deleted; the banner stays and the person can try again. `401` after one failed refresh: **this does not prove deletion**, because a refresh also fails with `REFRESH_TOKEN_INVALID` when the session expired, was ended, or the server lost its cached successor. The app signs out locally, remembers the unsure deletion on the phone (see "Unsure deletion" below) and shows the dialog `account.delete.unsure` instead of the account deleted screen. Only a `204` leads to the account deleted screen. (No endpoint reports whether an account was deleted; gap G17.) |
+| Unsure deletion: it was deleted | Next sign-in with the remembered number answers `isNewCustomer: true` | Dialog `account.delete.unsure.wasDeleted`, before complete profile. "Delete new account" opens this screen for the new account; "Keep new account" continues to complete profile. |
+| Unsure deletion: it was not deleted | Next sign-in with the remembered number answers `isNewCustomer: false` | This screen opens at once, with the information banner `account.delete.unsure.notDeleted`. The person can delete or keep the account as usual. |
 | Offline | No connection on "Delete" | Banner `common.offline.message`. Nothing sent. |
 | Largest text | | Scrolls. Dialogs scroll inside. Buttons stack. |
 
@@ -104,8 +106,22 @@ Shown when `DELETE /v1/me` answers `403 REAUTH_REQUIRED`.
 | `account.delete.reauth.action` | Send code | إرسال الرمز | |
 | `account.delete.deleting` | Deleting your account | جارٍ حذف الحساب | Spoken |
 | `account.delete.error.reauthAgain` | We couldn't confirm it's you. Try deleting again. | تعذّر تأكيد الهوية. يُرجى محاولة الحذف مرة أخرى. | |
-| `account.delete.unsure` | We couldn't confirm that your account was deleted, and you've been signed out. If you sign in again with the same number and your profile is empty, the deletion worked. If not, you can delete it again from Account. | تعذّر التأكد من حذف الحساب، وتم تسجيل الخروج. عند تسجيل الدخول مرة أخرى بالرقم نفسه، إذا كان الملف الشخصي فارغًا فقد تم الحذف، وإلا فيمكن حذف الحساب مرة أخرى من صفحة الحساب. | Dialog, with "OK". Rare. |
+| `account.delete.unsure` | We couldn't confirm that your account was deleted, and you've been signed out. The next time you sign in with this number, we'll tell you whether it was deleted. | تعذّر التأكد من حذف الحساب، وتم تسجيل الخروج. عند تسجيل الدخول التالي بهذا الرقم، سنوضّح ما إذا كان الحساب قد حُذف. | Dialog, with "OK". Rare. |
+| `account.delete.unsure.wasDeleted.title` | Your earlier account was deleted | تم حذف الحساب السابق | Dialog title |
+| `account.delete.unsure.wasDeleted.body` | Signing in just now created a new, empty account with this number. You can keep it or delete it. | أدى تسجيل الدخول الآن إلى إنشاء حساب جديد فارغ بهذا الرقم. يمكن الاحتفاظ به أو حذفه. | |
+| `account.delete.unsure.wasDeleted.delete` | Delete new account | حذف الحساب الجديد | Dialog action |
+| `account.delete.unsure.wasDeleted.keep` | Keep new account | الاحتفاظ بالحساب الجديد | Dialog action, the default |
+| `account.delete.unsure.notDeleted` | Your account wasn't deleted. You can delete it now. | لم يتم حذف الحساب. يمكن حذفه الآن. | Information banner on this screen |
 | `error.REAUTH_REQUIRED` | Confirm it's you first. | يُرجى تأكيد الهوية أولًا. | Fallback only. Normally the dialog handles this code. |
+
+## Unsure deletion
+
+After a timed-out `DELETE /v1/me`, the app cannot tell whether the account was deleted, and an empty-looking profile proves nothing: an account that was never deleted can also have no name or email. The next sign-in answers the question, because `isNewCustomer` says whether the account existed.
+
+- The app keeps an "unsure deletion" record in secure storage on the phone, holding only the account's phone number.
+- At the next successful sign-in with that number, it reads `isNewCustomer` from `POST /v1/auth/otp/verify`, acts as in the two "Unsure deletion" rows above, and then deletes the record.
+- A sign-in with a different number leaves the record in place. Uninstalling the app removes it.
+- The flow is shown once. It never reruns on later sign-ins.
 
 ## Right-to-left notes
 
