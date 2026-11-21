@@ -125,7 +125,7 @@ FeenGo/
 
 ## 3. S0 increments C1 to C11
 
-Each increment is one pull request that builds, tests and can be merged alone. **The increments are built in this order: each one is merged before the next one starts** (ROADMAP.md). When an increment is blocked on an owner answer, the next increment that is not blocked may go first, still one at a time (DECISIONS.md, 2026-11-19). In S0 that puts C8 and C9 before C6 and C7, which wait on questions 11 and 12. Only design specs and documents for the next slice may be prepared alongside.
+Each increment is one pull request that builds, tests and can be merged alone. **The increments are built in this order: each one is merged before the next one starts** (ROADMAP.md). When an increment is blocked on an owner answer, the next increment that is not blocked may go first, still one at a time (DECISIONS.md, 2026-11-19). In S0 that put C8 and C9 before C6, which waited on question 11 until the owner gave the app ID on 2026-11-19. C6 is no longer blocked. C7 and C10 are postponed by the owner (section 22, questions 12 and 16), so they are skipped while postponed. C7 is added later and is still needed before S0 is done (DECISIONS.md, 2026-11-19); S0 is done without C10 (2026-11-21). Only design specs and documents for the next slice may be prepared alongside.
 
 | Inc. | Pull request | Owner | CI job, written by release-manager | What proves it |
 | --- | --- | --- | --- | --- |
@@ -134,12 +134,12 @@ Each increment is one pull request that builds, tests and can be merged alone. *
 | C3 | CI for the API: workflow skeleton, install, lint, type check, unit and API tests with Postgres and Redis service containers, Docker build, contract lint with `redocly.yaml`, dependency scan | release-manager | This is the job | Pipeline green on a push |
 | C4 | Migration tool and settings tables: Kysely migrator, first migration creating `setting_definitions` and `settings`, migrate up, down, up in CI, type generation | backend-dev | Same pull request: migration and generated-types steps added to the api job | Migrations run forward and back on an empty database |
 | C5 | Design tokens package: DTCG token files with the provisional tokens, temporary dark-theme values that pass contrast (section 13), Style Dictionary build to CSS, TypeScript and Dart, contrast check, committed outputs | ui-ux-designer | Same pull request: design-tokens job | Build is reproducible; contrast check passes; CI fails if outputs are stale |
-| C6 | Flutter app shell: flavors, light and dark themes from tokens following the phone's setting, English and Arabic with right to left, a language switch that is remembered, placeholder home screen | mobile-dev | Same pull request: mobile job, which uploads the Android debug APK as a build artifact | Widget and golden tests in both languages and themes |
-| C7 | Analytics test event: Firebase projects wired per flavor, one test event | mobile-dev | No new job; the mobile job runs its tests | A unit test with a mocked analytics service proves the event is sent once with its parameters; the event is seen in Firebase DebugView from both phones |
+| C6 | Flutter app shell: flavors, light and dark themes from tokens following the phone's setting, English and Arabic with right to left, a language switch that is remembered, placeholder home screen; app ID `com.feengo.app`. No Firebase; Firebase projects come with C7 | mobile-dev | Same pull request: mobile job, which uploads the Android debug APK as a build artifact | Widget and golden tests in both languages and themes |
+| C7 | **Postponed by the owner (2026-11-19, question 12); still needed before S0 is done.** Analytics test event: Firebase projects wired per flavor, one test event | mobile-dev | No new job; the mobile job runs its tests | A unit test with a mocked analytics service proves the event is sent once with its parameters; the event is seen in Firebase DebugView from both phones |
 | C8 | Partner-web shell: Next.js app, tokens, English and Arabic with `lang` and `dir`, placeholder page | web-dev | Same pull request: partner-web job | Unit test and Playwright screenshot in both languages; ESLint runs cleanly with the pinned versions |
 | C9 | Admin-web shell: the same for the back office | web-dev | Same pull request: admin-web job | As C8 |
-| C10 | iOS build in CI: unsigned `flutter build ios` on macOS | release-manager | This is the job. Its trigger waits for the owner's answer to question 16 (section 22) | Job green |
-| C11 | Test suites: Maestro smoke flow, Playwright smoke for both websites, API contract tests, all in `tests/` | qa-tester | Same pull request: end-to-end and contract jobs | Full run green; S0 done-check in ROADMAP.md |
+| C10 | **Postponed by the owner (2026-11-19, question 16); S0 is done without it (2026-11-21).** iOS build in CI: unsigned `flutter build ios` on macOS | release-manager | This is the job, if the owner brings C10 back; its trigger is chosen then (section 21) | Job green |
+| C11 | Test suites: Maestro smoke flow, Playwright smoke for both websites, API contract tests, all in `tests/` | qa-tester | Same pull request: end-to-end and contract jobs | Full run green; S0 done-check: CI green for the API, tokens, websites and Android, and the owner runs the app on a real iPhone (through Xcode) and a real Android phone in both languages. C10 is not needed (DECISIONS.md, 2026-11-21); C7 still is (2026-11-19) |
 
 Nothing in an earlier increment depends on a later one.
 
@@ -149,6 +149,7 @@ ROADMAP.md's done-check needs the empty app running on a real iPhone and a real 
 
 - **iPhone:** installed from Xcode on the owner's Mac, signed with the owner's Apple team (`flutter run --flavor dev` with the phone connected). A free personal team works but its builds stop opening after 7 days; the paid Apple Developer Program account needed later for TestFlight works without that limit.
 - **Android:** the mobile CI job uploads the debug APK of the `dev` flavor as a build artifact; the owner downloads it and installs it on the phone.
+- **No iOS build in CI in S0.** The owner chose "Done without C10" (DECISIONS.md, 2026-11-21): on iOS, the Xcode run on a real iPhone is the proof, and CI covers Android. C10 can be added later.
 - **TestFlight and Google Play internal testing are not part of S0.** They start with the first tester release in S1 (ROADMAP.md, "When a slice is done", step 5).
 
 ## 4. Backend: modules, request pipeline and API conventions
@@ -750,9 +751,9 @@ apps/mobile/
 
 ### 11.3 Configuration and flavors
 
-- Three flavors, `dev`, `staging` and `prod`, each with its own app ID suffix and its own Firebase project, so test data never mixes with real data.
+- Three flavors, `dev`, `staging` and `prod`. `prod` uses the app ID `com.feengo.app` exactly (DECISIONS.md, 2026-11-19); `dev` and `staging` add a suffix, for example `com.feengo.app.dev` and `com.feengo.app.staging`, so all three can sit on one phone. Each flavor gets its own Firebase project in C7, not C6 (C6 has no Firebase; C7 is postponed by the owner), so test data never mixes with real data.
 - Settings per flavor (API base URL, environment name) come from `--dart-define-from-file=config/<flavor>.json`. The app holds no secrets; anything in an app can be extracted.
-- Firebase config files per flavor (`google-services.json`, `GoogleService-Info.plist`) are committed. They identify the project and are not secrets; their API keys are restricted to FeenGo's app IDs in the Google Cloud console.
+- From C7, Firebase config files per flavor (`google-services.json`, `GoogleService-Info.plist`) are committed. They identify the project and are not secrets; their API keys are restricted to FeenGo's app IDs in the Google Cloud console.
 - The language choice is kept in `shared_preferences`, so it is remembered before sign-in (C-03). After sign-in it is also saved to the profile, so the server can send messages in it.
 - The theme follows the phone's light or dark setting, with no in-app control in S0, as the designer's placeholder spec proposes (`docs/design/s0/placeholder-home.md` on pull request #2). An in-app control later would need only a second preference.
 
@@ -833,7 +834,7 @@ apps/mobile/
 ### 15.1 Analytics
 
 - Firebase Analytics in the app only, one Firebase project per environment. The websites send no analytics in S0 and S1.
-- **S0 test event (C7):** `foundation_test`, sent once when the placeholder home screen first appears, with parameters `language` and `theme`. Proved by a unit test with a mocked analytics service (the event is sent once, with its parameters), and checked in Firebase DebugView on a real iPhone and Android phone.
+- **S0 test event (C7, postponed by the owner on 2026-11-19 and still needed before S0 is done):** `foundation_test`, sent once when the placeholder home screen first appears, with parameters `language` and `theme`. Proved by a unit test with a mocked analytics service (the event is sent once, with its parameters), and checked in Firebase DebugView on a real iPhone and Android phone.
 - **Event plan for Q-06**, using Google Analytics' recommended names where they exist:
 
 | Q-06 event | Name | Slice |
@@ -882,10 +883,10 @@ Checked on 2026-11-18 against the sources:
 Things to know:
 
 - **Firebase's Apple SDK is now Swift Package Manager only.** FlutterFire pins its CocoaPods path at Firebase iOS SDK 12.19.3 because new releases stopped publishing to CocoaPods in October 2026; firebase_core 5.x uses Firebase iOS SDK 13 through Swift Package Manager. Flutter 3.50 turns Swift Package Manager on by default, so the iOS build must keep it on.
-- Flutter 3.50 needs Xcode 15 or later and recommends 16; App Store uploads need Apple's current Xcode. release-manager pins the macOS runner image and Xcode version in C10 and confirms the iOS 15 deployment target still builds with it.
+- Flutter 3.50 needs Xcode 15 or later and recommends 16; App Store uploads need Apple's current Xcode. If C10 comes back (it is postponed by the owner), release-manager pins the macOS runner image and Xcode version in it and confirms the iOS 15 deployment target still builds with it.
 - Q-02 is marked as a proposal in the PRD; raising the Android minimum later only reduces reach and needs no design change.
 
-**Q-04.** Text follows the phone's text size (no clamping in the app; `rem` units on the websites). Contrast is enforced by the token build (section 13). Golden tests and Playwright screenshots at the largest text size are part of each slice's review. Golden images are made and compared **on Linux CI only**, because font rendering differs between operating systems; the macOS job builds but does not run golden tests.
+**Q-04.** Text follows the phone's text size (no clamping in the app; `rem` units on the websites). Contrast is enforced by the token build (section 13). Golden tests and Playwright screenshots at the largest text size are part of each slice's review. Golden images are made and compared **on Linux CI only**, because font rendering differs between operating systems; the macOS job (if C10 comes back) builds but does not run golden tests.
 
 ## 17. Pinned versions
 
@@ -1101,7 +1102,7 @@ If the owner keeps Jest, these replace the Vitest rows; everything else stays th
 
 ts-jest 29.4.15 accepts TypeScript below 7, so it works with TypeScript 6.0.3. NestJS 12 is published as ES modules, so the API's Jest setup must run in Jest's ES module mode (`node --experimental-vm-modules`). That is the friction that made Vitest the proposal; it works, but it is less smooth.
 
-### 18.8 CI tools (release-manager, C3 and C10)
+### 18.8 CI tools (release-manager, C3, and C10 if it comes back)
 
 GitHub Actions maintained by GitHub (`actions/checkout`, `actions/setup-node`, `actions/cache`), `pnpm/action-setup`, `subosito/flutter-action` for Flutter, and Google's `osv-scanner` action for the dependency scan of both npm and pub packages. release-manager pins each to a full commit SHA in C3 and lists them in the pull request.
 
@@ -1111,7 +1112,7 @@ GitHub Actions maintained by GitHub (`actions/checkout`, `actions/setup-node`, `
 
 | Environment | Where | Data | Code provider | Firebase | From |
 | --- | --- | --- | --- | --- | --- |
-| `local` | each developer's machine, Docker Compose | throwaway | fake | `feengo-dev` | C1 |
+| `local` | each developer's machine, Docker Compose | throwaway | fake | `feengo-dev`, from C7 | C1 |
 | `test` | CI, service containers | made and destroyed per run | fake | none | C3 |
 | `staging` | the chosen host | sample venues, testers | real vendor, test numbers | `feengo-staging` | S1, once the host is chosen |
 | `production` | the chosen host, separate project or account | real | real vendor | `feengo-prod` | before the first public release (after S6) |
@@ -1176,14 +1177,14 @@ None of them stores data in Egypt. Egypt's Personal Data Protection Law (Law 151
 
 GitHub Actions, every job written by release-manager. One workflow with one job per app, plus a final summary job that branch protection requires.
 
-**Until the owner answers question 16, CI follows ROADMAP.md literally:** every push to any branch and every pull request runs every Linux job for all four apps, with no path filters. Only the macOS iOS job (C10) depends on the answer, and C10 is not merged before it.
+**CI follows ROADMAP.md literally:** every push to any branch and every pull request runs every Linux job for all four apps. **No path filters, by the owner's choice** ("Keep checking everything", DECISIONS.md, 2026-11-21). **The macOS iOS job (C10) is postponed** by the owner (DECISIONS.md, 2026-11-19), and S0 is done without it (2026-11-21).
 
 | Trigger | Runner | Jobs |
 | --- | --- | --- |
 | Every push to any branch, and every pull request | Linux | **api**: install, lint, type check, unit tests, API tests against Postgres and Redis service containers, migrations up, down, up, generated-types check, Docker build. **admin-web**, **partner-web**: install, lint, type check, unit tests, `next build`, Playwright smoke. **design-tokens**: build, stale-output check, contrast check. **mobile**: `flutter analyze`, `flutter test` including golden tests (Linux only, section 16), translation check, debug Android build uploaded as an artifact. **contract**: Redocly lint of `openapi.yaml`. **security**: osv-scanner on all lockfiles. **e2e** (from C11): contract tests, Playwright journeys, Maestro smoke on an Android emulator. |
-| To be decided (question 16) | macOS | **ios**: `flutter build ios --no-codesign` for the `staging` flavor |
+| Postponed (C10, question 16) | macOS | **ios**: `flutter build ios --no-codesign` for the `staging` flavor |
 
-**The iOS cost trade-off (question 16).** Estimates, because I could not check GitHub's current price page from here. On private repositories, GitHub has billed macOS minutes at about ten times Linux minutes; the Free plan includes 2,000 Linux-equivalent minutes a month and Team 3,000. An unsigned Flutter iOS build takes about 10 to 15 minutes, so 100 to 150 Linux-equivalent minutes each.
+**The iOS cost trade-off (question 16).** Kept for when C10 comes back; the owner has postponed C10, so no option is chosen. Estimates, because I could not check GitHub's current price page from here. On private repositories, GitHub has billed macOS minutes at about ten times Linux minutes; the Free plan includes 2,000 Linux-equivalent minutes a month and Team 3,000. An unsigned Flutter iOS build takes about 10 to 15 minutes, so 100 to 150 Linux-equivalent minutes each.
 
 | Option | Builds a month (rough) | Cost |
 | --- | --- | --- |
@@ -1191,7 +1192,7 @@ GitHub Actions, every job written by release-manager. One workflow with one job 
 | B. Pull requests to `main` that touch `apps/mobile` or `packages/design-tokens` (the architect's proposal) | 10 to 20 | About the size of the free allowance; at most a few tens of US dollars |
 | C. As B, plus a nightly build of `main` | 40 to 50 | Roughly USD 30 to 60 |
 
-A public repository has no minute charges, but makes the code public. Path filters for the Linux jobs would also save minutes, but they too depart from "every push builds all four apps", so they wait for the same answer.
+A public repository has no minute charges, but makes the code public. Path filters for the Linux jobs would also save minutes; the owner chose not to use them (DECISIONS.md, 2026-11-21).
 
 **Contract lint rules (C3).** release-manager adds `redocly.yaml` at the root in C3. The file is not added now. Its content, checked on 2026-11-18 against the current contract with @redocly/cli 2.80.0 (it passes, and it fails when an operation's `x-roles` is removed):
 
@@ -1226,7 +1227,7 @@ A new endpoint without its roles, rate limits or idempotency note then fails CI.
 
 ## 22. Questions for the owner
 
-1. **Hosting.** Choose option A, B or C (section 20) before S1. I recommend A.
+1. **Hosting.** **On hold since 2026-11-19:** the owner asked whether there is a free option for the coming phase, then paying when scaling. That is a question back, not a decision. Hosting is first needed when testers use S1; before then the architect brings one concrete free setup (for example Oracle Cloud Always Free, or a free container host with Neon and Upstash), with prices checked on the day. **Paused:** the earlier recommendation of option A among A, B and C (section 20) is on hold until the free setup is brought; the options stay in section 20 for comparison.
 2. **Lawyer on data location.** Is hosting outside Egypt allowed for production, and what licence or permit does PDPL require? Staging can start before the answer.
 3. **Code vendors.** Choose the WhatsApp and SMS providers (section 7.3) and start Egyptian SMS sender ID registration and the Meta Business verification now, because both take time.
 4. **Vitest instead of Jest.** **Answered 2026-11-18:** Vitest for the API, website and contract tests; STACK.md updated (DECISIONS.md). Original question: STACK.md listed Jest. NestJS 12's own template has moved to Vitest, and Jest is awkward with ES modules. I propose Vitest for the API, website and contract tests (its test syntax is almost the same as Jest's). This changes a line in STACK.md, so it needs your approval. If you refuse, section 18.7 has the exact Jest list. Needed before C2.
@@ -1236,12 +1237,12 @@ A new endpoint without its roles, rate limits or idempotency note then fails CI.
 8. **Name at sign-up.** May a new customer skip giving a name in S1? The proposal is yes: the app asks right after the first sign-in, the API allows it to be empty, and a name becomes required before the first booking in S4.
 9. **Admin sign-in (A-01).** Approve email, password and authenticator app, with admin accounts created only by the seed command that you run on the server (section 9). Note the known weakness: anyone who knows an admin's email can lock that admin out for 15 minutes (section 9.1).
 10. **Deep links (C-08, S3).** Approve the free approach (no venue after an iOS install), or budget for a paid linking service.
-11. **Domain and app IDs.** Which domain will FeenGo use (for the API, the websites and shared links), and which app IDs (for example `app.feengo.customer`)? Needed before C6 for the IDs and before S1 staging for the domain.
-12. **Firebase projects.** Please create `feengo-dev`, `feengo-staging` and `feengo-prod` (or allow release-manager to prepare the steps for you). Needed for C7.
+11. **Domain.** **App ID answered 2026-11-19:** `com.feengo.app` for the customer app on iPhone and Android (DECISIONS.md). Still open: which domain will FeenGo use, for the API, the websites and shared links? Needed before S1 staging.
+12. **Firebase projects.** **Answered 2026-11-19: postponed.** Analytics is skipped for now; C6 is built without Firebase and C7 (the analytics test event) waits. S0 is not done until C7 lands (DECISIONS.md). When C7 comes back: please create `feengo-dev`, `feengo-staging` and `feengo-prod` (or allow release-manager to prepare the steps for you).
 13. **Environments.** Agree that there is no separately hosted development environment, and that production is set up shortly before the first public release.
 14. **Billing tables.** DECISIONS says the billing structure exists in the database "from the start". The proposal is to create the plan tables in S2, together with the venues they belong to, switched off. Agree?
 15. **Additional endpoint.** The contract adds `GET /v1/admin/me`, which was not in the S1 list, so the back office can show who is signed in and can add the API's deny-list check to every page (section 8.3). Agree? If not, the admin pages stay protected by the proxy's and `requireAdmin()`'s token checks and by the API refusing every data call (section 8.3).
-16. **iOS CI and path filters.** ROADMAP.md says the pipeline "builds all four apps on every push and pull request". Doing that for iOS on macOS costs far more than everything else (section 21, options A to C). Choose A (as written, several hundred US dollars a month), B (pull requests to `main` that touch the app, the architect's proposal), or C (B plus nightly). Also say whether Linux jobs may skip apps that did not change. Until you answer, Linux jobs run for every app on every push, and C10 waits. Needed before C10.
+16. **iOS CI and path filters.** **Fully answered.** iOS part, 2026-11-19: C10 is postponed; the owner is not sure it is needed in this phase. 2026-11-21: S0 is done without C10, and Linux jobs keep checking every app on every push, with no path filters (DECISIONS.md). Original question: ROADMAP.md says the pipeline "builds all four apps on every push and pull request"; doing that for iOS on macOS costs far more than everything else (section 21, options A to C), and Linux jobs could skip apps that did not change.
 17. **`customers` module.** STACK.md lists the modules auth, venues, availability, bookings, events, payments, notifications, settings and admin. The design adds `customers` for profile data (section 4.2). Agree?
 18. **Code rules as admin settings.** Make the code expiry, number of tries and lock time (and the resend and request limits) admin settings with the ranges in section 6.3, rather than fixed configuration? The defaults are the PRD's values either way. Needed before S1.
 19. **C-01 and "done" for S1.** ROADMAP.md says a slice is done when tests pass for all of its acceptance checks. C-01's check needs venue pages and booking, which come in S3 and S4, so S1 can only test part of it (section 23). Proposal: S1 counts as done with C-01's S1 part tested, and the rest of C-01 is checked in S3 and S4.
@@ -1261,10 +1262,10 @@ A new endpoint without its roles, rate limits or idempotency note then fails CI.
 
 | ID | Slice | Covered by | What the slice proves |
 | --- | --- | --- | --- |
-| Q-02 | S0 | Section 16; `minSdk 26` and iOS 15.0 in C6; CI iOS build C10 | The shell builds for and runs on iOS 15 and Android 8; the ROADMAP done-check runs it on a real iPhone and Android phone. No version conflict found. |
+| Q-02 | S0 | Section 16; `minSdk 26` and iOS 15.0 in C6; Android build in the mobile CI job; the owner's Xcode run on a real iPhone. The CI iOS build (C10) is postponed | The shell builds for and runs on iOS 15 and Android 8: Android CI builds it, and the ROADMAP done-check runs it on a real iPhone (through Xcode) and a real Android phone. No version conflict found. |
 | Q-04 | S0 | Sections 11.4, 12 and 13 (contrast check in the token build); golden tests and Playwright screenshots at the largest text size (C6, C8, C9, C11) | Text follows the system size; every token pair passes WCAG AA in light and dark mode |
 | Q-05 | S0, S1 | Security baseline mapped in sections 4.3 to 4.6 (headers, validation, roles, logging and redaction, client IP), 5.1 (database roles), 7 (code limits), 8 (tokens and web sessions), 9 (admin sign-in, append-only log), 19.3 (secrets), 20 (hosting baseline), 21 (dependency scan) | S0: secrets only in the environment, dependency scan in CI, the log-redaction test. S1: the code limits and race tests (section 7.5), the refresh tests (section 8.1), the forged-cookie tests (section 8.3), and the append-only test for the activity log. Hosting encryption and HTTPS are proved when staging is set up. |
-| Q-06 | S0 | Section 15.1; increment C7 | The `foundation_test` event is sent once with its parameters (unit test with a mocked analytics service) and arrives in Firebase DebugView from both platforms. The full event list grows with each slice. |
+| Q-06 | S0 | Section 15.1; increment C7 (postponed by the owner; S0 is not done until it lands) | The `foundation_test` event is sent once with its parameters (unit test with a mocked analytics service) and arrives in Firebase DebugView from both platforms. The full event list grows with each slice. |
 | Q-07 | S1, partly | Section 10; `DELETE /v1/me` | **S1 proves** account deletion works inside the app. **Not yet:** the demo account for store reviewers, designed before the first public release, or in S1 if testers are external (question 20). |
 | C-01 | S1, partly | Section 11.1 (route guard and return path); no sign-in wall on the home screen | **S1 proves:** a visitor can open the app and use the home screen and the language switch without an account; opening the profile, the only screen that needs an account in S1, sends the visitor to sign-in, and after signing in they return to the profile. **Not yet:** searching and opening venue pages (S3) and "booking asks them to sign in, then returns them" (S4), which reuse the same mechanism. Whether this partial proof is enough for S1 to count as done is question 19. |
 | C-02 | S1 | Section 7; settings in 6.3; `POST /v1/auth/otp/request`, `POST /v1/auth/otp/verify`, `POST /v1/auth/refresh`, `POST /v1/auth/logout`; tables `otp_challenges`, `devices`, `refresh_tokens` | Code by WhatsApp, with SMS when WhatsApp refuses the message and SMS on request at resend (with the fake provider in CI and a real vendor on staging); expiry after 5 minutes, lock for 15 minutes after five wrong tries, limits per phone and per device, and the race tests in section 7.5. Late fallback after a WhatsApp delivery failure waits for the vendor choice (section 7.1). |
@@ -1329,7 +1330,7 @@ After a fresh sign-in within 10 minutes: personal fields removed, sessions revok
 
 ### 24.13 Flutter uses Riverpod and go_router (with this document)
 
-`flutter_riverpod` 3 without code generation, `go_router` with the sign-in redirect that returns the customer where they were (C-01), three flavors each with its own Firebase project. The theme follows the phone in S0.
+`flutter_riverpod` 3 without code generation, `go_router` with the sign-in redirect that returns the customer where they were (C-01), three flavors, each with its own Firebase project from C7 (C6 has no Firebase). The theme follows the phone in S0.
 
 ### 24.14 Design tokens built with Style Dictionary, outputs committed (with this document)
 
@@ -1349,11 +1350,11 @@ Firebase Dynamic Links is shut down. Free platform links with the Play Install R
 
 ### 24.18 CI cadence (question 16)
 
-Linux jobs for every app on every push and pull request. The iOS build on macOS for pull requests to `main` that touch the app or the tokens (option B in section 21), because running it on every push costs several hundred US dollars a month.
+**Decided 2026-11-21, see DECISIONS.md:** Linux jobs for every app on every push and pull request, with no path filters (the owner chose "Keep checking everything"). **Postponed:** the iOS build on macOS (C10), by the owner on 2026-11-19; S0 is done without it. The earlier proposal of option B in section 21 is kept for when C10 comes back, and is not decided.
 
 ### 24.19 Hosting (question 1)
 
-Option A, DigitalOcean in Frankfurt, recommended over Hetzner (cheapest, most work) and Google Cloud in Doha or Dammam (closest, dearest). Data location subject to the lawyer (question 2).
+**On hold since 2026-11-19:** the owner asked for a free option for the coming phase first; this recommendation is paused until the architect brings a concrete free setup, before testers need S1. Earlier recommendation, kept for comparison: option A, DigitalOcean in Frankfurt, recommended over Hetzner (cheapest, most work) and Google Cloud in Doha or Dammam (closest, dearest). Data location subject to the lawyer (question 2).
 
 ### 24.20 Node 26 in cloud sessions through the session-start hook (question 21)
 
