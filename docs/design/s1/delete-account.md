@@ -79,8 +79,9 @@ Shown when `DELETE /v1/me` answers `403 REAUTH_REQUIRED`.
 | Still needs a recent sign-in after confirming | `403 REAUTH_REQUIRED` again, right after a correct code | Banner `account.delete.error.reauthAgain`. Reported to crash reporting, because this should not happen. |
 | Session ended | `401` after one failed refresh | Sign-in prompt, "session ended" form. After signing in, back here, nothing deleted. |
 | Service down | `503`, `500`, timeout | Banner with the shared message. "Delete my account" works again. A timeout may mean the deletion happened, so the app then calls `GET /v1/me`. `200`: not deleted; the banner stays and the person can try again. `401` after one failed refresh: **this does not prove deletion**, because a refresh also fails with `REFRESH_TOKEN_INVALID` when the session expired, was ended, or the server lost its cached successor. The app signs out locally, remembers the unsure deletion on the phone (see "Unsure deletion" below) and shows the dialog `account.delete.unsure` instead of the account deleted screen. Only a `204` leads to the account deleted screen. (No endpoint reports whether an account was deleted; gap G17.) |
-| Unsure deletion: it was deleted | Next sign-in with the remembered number answers `isNewCustomer: true` | Dialog `account.delete.unsure.wasDeleted`, before complete profile. "Delete new account" opens this screen for the new account; "Keep new account" continues to complete profile. |
-| Unsure deletion: it was not deleted | Next sign-in with the remembered number answers `isNewCustomer: false` | This screen opens at once, with the information banner `account.delete.unsure.notDeleted`. The person can delete or keep the account as usual. |
+| Unsure deletion: deleted, new account made by this sign-in | Next sign-in with the remembered number answers `isNewCustomer: true` | Dialog `account.delete.unsure.wasDeleted` with `.body`, before complete profile. "Delete new account" opens this screen for the new account; "Keep new account" continues to complete profile. |
+| Unsure deletion: deleted, number signed up again elsewhere | `isNewCustomer: false`, and `customer.createdAt` is later than the stored request time | Dialog `account.delete.unsure.wasDeleted` with `.bodyElsewhere`. Same two actions; "Keep new account" continues to `from`. |
+| Unsure deletion: not deleted | `isNewCustomer: false`, and `customer.createdAt` is earlier than the stored request time | This screen opens at once, with the information banner `account.delete.unsure.notDeleted`. The person can delete or keep the account as usual. |
 | Offline | No connection on "Delete" | Banner `common.offline.message`. Nothing sent. |
 | Largest text | | Scrolls. Dialogs scroll inside. Buttons stack. |
 
@@ -111,15 +112,23 @@ Shown when `DELETE /v1/me` answers `403 REAUTH_REQUIRED`.
 | `account.delete.unsure.wasDeleted.body` | Signing in just now created a new, empty account with this number. You can keep it or delete it. | أدى تسجيل الدخول الآن إلى إنشاء حساب جديد فارغ بهذا الرقم. يمكن الاحتفاظ به أو حذفه. | |
 | `account.delete.unsure.wasDeleted.delete` | Delete new account | حذف الحساب الجديد | Dialog action |
 | `account.delete.unsure.wasDeleted.keep` | Keep new account | الاحتفاظ بالحساب الجديد | Dialog action, the default |
-| `account.delete.unsure.notDeleted` | Your account wasn't deleted. You can delete it now. | لم يتم حذف الحساب. يمكن حذفه الآن. | Information banner on this screen |
+| `account.delete.unsure.bodyElsewhere` | This number now has a newer account, created after your deletion request, for example on another phone. You can keep it or delete it. | يوجد الآن حساب أحدث بهذا الرقم، أُنشئ بعد طلب الحذف، مثلًا من هاتف آخر. يمكن الاحتفاظ به أو حذفه. | Dialog body, created-elsewhere case |
+| `account.delete.unsure.notDeleted` | We couldn't confirm that your earlier deletion went through, and this account was created before it. You can delete it now. | تعذّر التأكد من إتمام طلب الحذف السابق، وقد أُنشئ هذا الحساب قبله. يمكن حذفه الآن. | Information banner on this screen. Says "couldn't confirm", because the comparison depends on the phone's clock. |
 | `error.REAUTH_REQUIRED` | Confirm it's you first. | يُرجى تأكيد الهوية أولًا. | Fallback only. Normally the dialog handles this code. |
 
 ## Unsure deletion
 
 After a timed-out `DELETE /v1/me`, the app cannot tell whether the account was deleted, and an empty-looking profile proves nothing: an account that was never deleted can also have no name or email. The next sign-in answers the question, because `isNewCustomer` says whether the account existed.
 
-- The app keeps an "unsure deletion" record in secure storage on the phone, holding only the account's phone number.
-- At the next successful sign-in with that number, it reads `isNewCustomer` from `POST /v1/auth/otp/verify`, acts as in the two "Unsure deletion" rows above, and then deletes the record.
+- The app keeps an "unsure deletion" record in secure storage on the phone. It holds three things:
+  - **a keyed hash of the account's E.164 number**, never the number itself: HMAC-SHA-256 with a random key made for this record and kept beside it in secure storage. Matching needs nothing more. Phone numbers are easy to guess, so this keeps the number out of plain sight rather than making it unrecoverable;
+  - **the time the timed-out `DELETE /v1/me` was sent**, by the phone's clock;
+  - **an expiry**: the `refreshTokenExpiresAt` of the session the app held at that moment, which follows the customer refresh-token lifetime (`CUSTOMER_REFRESH_TTL_DAYS`, 60 days by default, security configuration and not a business rule). The app checks the expiry at each launch and deletes an expired record, and then shows nothing.
+- At the next successful sign-in with a number whose hash matches, the app decides from `POST /v1/auth/otp/verify`:
+  - **deleted** if `isNewCustomer` is true, or if `customer.createdAt` (in the contract's `Customer` schema) is later than the stored request time, which means the number signed up again elsewhere;
+  - **not deleted** otherwise;
+  - then acts as in the three "Unsure deletion" rows above and deletes the record.
+- The comparison uses the phone's clock for the stored time and the server's for `createdAt`. A badly wrong phone clock could mislead it, which is why the "not deleted" banner says "couldn't confirm" (related to gap G11).
 - A sign-in with a different number leaves the record in place. Uninstalling the app removes it.
 - The flow is shown once. It never reruns on later sign-ins.
 
