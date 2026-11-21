@@ -1,25 +1,27 @@
 // IBM Plex Sans Arabic from the design tokens package, served by this app with
 // next/font/local, so no request goes to Google at run time (docs/ARCHITECTURE.md
-// section 12). next/font needs literal paths relative to this file.
+// section 12). next/font needs literal values and paths relative to this file.
 //
-// next/font preloads per call, not per face, so there are two calls (next/font needs literal values, hence the repeated declaration): Regular, the
+// Every face declares the family name the token uses, 'IBM Plex Sans Arabic', so
+// the token's own stack (--font-family-base) finds them and nothing maps names.
+// next/font's size-adjusted fallback face is off: its generated family would sit
+// in front of the token's stack, and on machines with Arial it would win.
+//
+// next/font preloads per call, not per face, so there are two calls: Regular, the
 // body text, is preloaded; Medium and Bold load when the page first uses them.
-// Both declare the same family name, the one in the token (--font-family-base),
-// so the token's font stack picks up every weight. The variable from the first
-// call adds next/font's size-adjusted fallback face; globals.css puts it in front
-// of the token's stack.
+// layout.tsx puts both classes on <html>, which keeps their CSS in the build.
 import localFont from 'next/font/local';
 
-export const plexSansArabic = localFont({
+export const plexSansArabicRegular = localFont({
   src: '../../../../packages/design-tokens/fonts/IBMPlexSansArabic-Regular.ttf',
   weight: '400',
   style: 'normal',
   declarations: [{ prop: 'font-family', value: "'IBM Plex Sans Arabic'" }],
-  variable: '--font-plex-sans-arabic',
+  variable: '--font-plex-sans-arabic-regular',
+  adjustFontFallback: false,
   display: 'swap',
 });
 
-// Not exported for a class: its faces are registered by importing this module.
 export const plexSansArabicMediumBold = localFont({
   src: [
     {
@@ -34,6 +36,8 @@ export const plexSansArabicMediumBold = localFont({
     },
   ],
   declarations: [{ prop: 'font-family', value: "'IBM Plex Sans Arabic'" }],
+  variable: '--font-plex-sans-arabic-medium-bold',
+  adjustFontFallback: false,
   display: 'swap',
   preload: false,
 });

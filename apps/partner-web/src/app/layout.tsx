@@ -4,7 +4,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { colors } from '@feengo/design-tokens/tokens';
 import '@feengo/design-tokens/tokens.css';
 import { directionOf } from '@/i18n/locale';
-import { plexSansArabic } from './fonts';
+import { plexSansArabicMediumBold, plexSansArabicRegular } from './fonts';
 import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -29,7 +29,7 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   const locale = await getLocale();
   return (
-    <html lang={locale} dir={directionOf(locale)} className={plexSansArabic.variable}>
+    <html lang={locale} dir={directionOf(locale)} className={`${plexSansArabicRegular.variable} ${plexSansArabicMediumBold.variable}`}>
       <body>{children}</body>
     </html>
   );

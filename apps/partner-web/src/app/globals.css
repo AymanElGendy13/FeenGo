@@ -11,12 +11,8 @@
 }
 
 html {
-  /*
-   * next/font/local serves IBM Plex Sans Arabic under a generated family name in
-   * --font-plex-sans-arabic (fonts.ts). It goes first; the token's own family
-   * list follows as the fallback, so the token stays the source of the stack.
-   */
-  font-family: var(--font-plex-sans-arabic), var(--font-family-base);
+  /* fonts.ts serves IBM Plex Sans Arabic under the token's family name. */
+  font-family: var(--font-family-base);
   font-weight: var(--font-weight-regular);
   background-color: var(--color-surface);
   color: var(--color-on-surface);
