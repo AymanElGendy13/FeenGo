@@ -28,6 +28,18 @@ for (const locale of locales) {
         });
       }
 
+      for (const size of sizes) {
+        test(`not-found page at ${widths[size]} px`, async ({ page }) => {
+          await page.setViewportSize({ width: widths[size], height: heights[size] });
+          await page.goto('/no-such-page');
+          await waitForFonts(page);
+          await page.screenshot({
+            path: `screenshots/not-found-${locale}-${theme}-${widths[size]}.png`,
+            fullPage: true,
+          });
+        });
+      }
+
       test('keyboard focus on the selected option at 360 px', async ({ page }) => {
         await page.setViewportSize({ width: widths.phone, height: heights.phone });
         await page.goto('/');

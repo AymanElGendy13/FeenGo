@@ -29,7 +29,11 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   const locale = await getLocale();
   return (
-    <html lang={locale} dir={directionOf(locale)} className={`${plexSansArabicRegular.variable} ${plexSansArabicMediumBold.variable}`}>
+    <html
+      lang={locale}
+      dir={directionOf(locale)}
+      className={`${plexSansArabicRegular.variable} ${plexSansArabicMediumBold.variable}`}
+    >
       <body>{children}</body>
     </html>
   );

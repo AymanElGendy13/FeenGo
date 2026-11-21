@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ar from '../../../messages/ar.json';
@@ -61,5 +61,17 @@ describe('PlaceholderHome', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'العربية' }));
     expect(setLocale).toHaveBeenCalledExactlyOnceWith('ar');
     expect(screen.getByRole('radio', { name: 'العربية' })).toBeChecked();
+  });
+
+  it('C-03 a language change that cannot be saved keeps the current language', async () => {
+    vi.mocked(setLocale).mockRejectedValueOnce(new Error('Failed to fetch'));
+    renderForCookie(undefined);
+
+    fireEvent.click(screen.getByRole('radio', { name: 'العربية' }));
+    expect(setLocale).toHaveBeenCalledExactlyOnceWith('ar');
+
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'English' })).toBeChecked());
+    expect(screen.getByRole('radio', { name: 'العربية' })).not.toBeChecked();
+    expect(screen.getByRole('heading', { level: 1, name: 'FeenGo Partner' })).toBeInTheDocument();
   });
 });

@@ -218,7 +218,7 @@ Both names are provisional and need owner approval.
 Shown for any address that has no page. The server answers with HTTP status 404.
 
 - **Layout:** the same placeholder layout and colour roles as the home page, top to bottom: the app name heading (its name key, unchanged), the not-found title, the body line, the home link, then the language section and control. Spacing as on the home page: title 8 px below the app name, body 8 px below the title, link 16 px below the body, language section 48 px below the link. Logical properties only (start and end), no left or right.
-- **Type:** the not-found title uses the Label style at 18 px, Medium, in `onSurface`. The body uses the Body style in `onSurface`.
+- **Type:** the not-found title uses the Body size with Medium weight, in `onSurface` (the type tokens have no 18 px step; a new step would be a design-system change). The body uses the Body style in `onSurface`.
 - **Home link:** yes, one link to the dashboard's home page, `/`. It is the one primary action. It is a text link in `onSurface`, underlined so it is never shown by colour alone, at least 44 by 44 px as a target, with the same focus ring rule.
 - **Language control:** kept, and works as on the home page. Switching it keeps the person on the not-found page.
 - **`lang` and `dir`:** follow the saved language, sent by the server from the first byte, as on the home page. First visit is English.
@@ -233,6 +233,6 @@ Shown for any address that has no page. The server answers with HTTP status 404.
 **Accessibility**
 
 - **One `h1`:** the app name stays the page's only `h1`, as on the home page. The not-found title is an `h2`.
-- **Page title:** `error.notFound.title`, a separator, then the name key. For example "Page not found – FeenGo Partner" and "الصفحة غير موجودة – FeenGo للشركاء".
+- **Page title:** one message, `error.notFound.pageTitle` = "{title} – {appName}" in both languages, filled with `error.notFound.title` and the name key, so no text or punctuation is written in code. For example "Page not found – FeenGo Partner" and "الصفحة غير موجودة – FeenGo للشركاء".
 - **Reading and focus order:** app name, title, body, home link, language title, English, العربية.
 - The link's accessible name is its visible text.

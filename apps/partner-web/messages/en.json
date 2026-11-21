@@ -17,5 +17,12 @@
         "ar": "العربية"
       }
     }
+  },
+  "error": {
+    "notFound": {
+      "title": "Page not found",
+      "body": "This page doesn't exist or has moved.",
+      "home": "Go to the home page"
+    }
   }
 }

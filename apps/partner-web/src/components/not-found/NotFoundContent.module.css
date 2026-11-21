@@ -1,0 +1,51 @@
+/* Not-found state. Tokens only, logical properties only. */
+
+/*
+ * The spec asks for the Label style at 18 px, Medium. No type token has that
+ * size, so until one exists this uses the body size with the label weight
+ * (reported to ui-ux-designer); no value is written by hand.
+ */
+.title {
+  margin-block: var(--spacing-sm) 0;
+  font-size: var(--typography-body-font-size);
+  font-weight: var(--typography-label-font-weight);
+  line-height: var(--typography-body-line-height);
+  text-align: center;
+}
+
+.body {
+  margin-block: var(--spacing-sm) 0;
+  font-size: var(--typography-body-font-size);
+  font-weight: var(--typography-body-font-weight);
+  line-height: var(--typography-body-line-height);
+  text-align: center;
+}
+
+.action {
+  margin-block: var(--spacing-md) 0;
+  text-align: center;
+}
+
+/* A text link, underlined so it never relies on colour, with a 48 px target. */
+.home {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: var(--size-touch-target-min);
+  min-inline-size: var(--size-touch-target-min);
+  padding-inline: var(--spacing-sm);
+  border-radius: var(--radius-xs);
+  color: var(--color-on-surface);
+  font-size: var(--typography-body-font-size);
+  line-height: var(--typography-body-line-height);
+  text-decoration: underline;
+}
+
+/* The same focus ring as the language control: 2 px gap in surface, then 2 px of focus. */
+.home:focus-visible {
+  outline: var(--stroke-focus-ring) solid transparent;
+  outline-offset: var(--stroke-focus-gap);
+  box-shadow:
+    0 0 0 var(--stroke-focus-gap) var(--color-surface),
+    0 0 0 calc(var(--stroke-focus-gap) + var(--stroke-focus-ring)) var(--color-focus);
+}
