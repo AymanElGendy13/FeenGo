@@ -751,7 +751,7 @@ apps/mobile/
 
 ### 11.3 Configuration and flavors
 
-- Three flavors, `dev`, `staging` and `prod`, each with its own suffix on the app ID `com.feengo.app`. Each flavor gets its own Firebase project in C7, not C6 (C6 has no Firebase; C7 is postponed by the owner), so test data never mixes with real data.
+- Three flavors, `dev`, `staging` and `prod`. `prod` uses the app ID `com.feengo.app` exactly (DECISIONS.md, 2026-11-19); `dev` and `staging` add a suffix, for example `com.feengo.app.dev` and `com.feengo.app.staging`, so all three can sit on one phone. Each flavor gets its own Firebase project in C7, not C6 (C6 has no Firebase; C7 is postponed by the owner), so test data never mixes with real data.
 - Settings per flavor (API base URL, environment name) come from `--dart-define-from-file=config/<flavor>.json`. The app holds no secrets; anything in an app can be extracted.
 - From C7, Firebase config files per flavor (`google-services.json`, `GoogleService-Info.plist`) are committed. They identify the project and are not secrets; their API keys are restricted to FeenGo's app IDs in the Google Cloud console.
 - The language choice is kept in `shared_preferences`, so it is remembered before sign-in (C-03). After sign-in it is also saved to the profile, so the server can send messages in it.
@@ -886,7 +886,7 @@ Things to know:
 - Flutter 3.50 needs Xcode 15 or later and recommends 16; App Store uploads need Apple's current Xcode. If C10 comes back (it is postponed by the owner), release-manager pins the macOS runner image and Xcode version in it and confirms the iOS 15 deployment target still builds with it.
 - Q-02 is marked as a proposal in the PRD; raising the Android minimum later only reduces reach and needs no design change.
 
-**Q-04.** Text follows the phone's text size (no clamping in the app; `rem` units on the websites). Contrast is enforced by the token build (section 13). Golden tests and Playwright screenshots at the largest text size are part of each slice's review. Golden images are made and compared **on Linux CI only**, because font rendering differs between operating systems; the macOS job builds but does not run golden tests.
+**Q-04.** Text follows the phone's text size (no clamping in the app; `rem` units on the websites). Contrast is enforced by the token build (section 13). Golden tests and Playwright screenshots at the largest text size are part of each slice's review. Golden images are made and compared **on Linux CI only**, because font rendering differs between operating systems; the macOS job (if C10 comes back) builds but does not run golden tests.
 
 ## 17. Pinned versions
 

@@ -4,7 +4,7 @@ A running log of decisions, newest first. Add an entry whenever something signif
 
 ## 2026-11-21: S0 done without C10
 
-S0 counts as done without the iOS build in CI (C10). S0 is done when CI is green for the API, the design tokens, both websites and Android, and the owner has run the app on a real iPhone (through Xcode) and a real Android phone, in both languages. The analytics test event (C7) is still needed (entry of 2026-11-19). C10 can be added later. Why: the owner is not sure iOS CI is needed in this phase, and the run on a real iPhone shows that the app builds and runs on iOS. Decided by the owner, choosing "Done without C10".
+S0 counts as done without the iOS build in CI (C10); ROADMAP's done-check is otherwise unchanged. The iPhone side is shown by the owner's run on a real iPhone through Xcode. The analytics test event (C7) is still needed (entry of 2026-11-19). C10 can be added later. Why: the owner is not sure iOS CI is needed in this phase, and the run on a real iPhone shows that the app builds and runs on iOS. Decided by the owner, choosing "Done without C10".
 
 ## 2026-11-21: Keep checking everything (no path filters)
 
